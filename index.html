@@ -346,6 +346,7 @@
       <div class="hint" style="margin-top:-6px;">성별표나 마감 지망순위, 학생 정보를 나중에 고친 뒤 이 탭에 그대로 있는 상태라면 "재검증"을 눌러 최신 값으로 다시 확인하세요. 탭을 벗어났다가 돌아오면 자동으로 다시 확인됩니다. 학생 번호가 "3학년 7반 16번"처럼 다르게 표시되거나 성별을 찾지 못하는 경우 "학생 번호 정리"를 눌러 "3-7-16" 형태로 통일하세요.</div>
       <div class="row" style="margin-top:6px;">
         <label class="small" style="display:flex; align-items:center; gap:4px; font-weight:500;"><input type="checkbox" id="select-all-results"> 전체 선택</label>
+        <button class="btn secondary" id="print-selected-btn" disabled>선택 인쇄 (<span id="selected-print-count">0</span>)</button>
         <button class="btn danger" id="delete-selected-btn" disabled>선택 삭제 (<span id="selected-count">0</span>)</button>
       </div>
       <div id="results-list"></div>
@@ -1305,6 +1306,8 @@ let selectedForDelete = new Set();
 function updateDeleteSelectedUI(){
   document.getElementById('selected-count').textContent = selectedForDelete.size;
   document.getElementById('delete-selected-btn').disabled = selectedForDelete.size === 0;
+  document.getElementById('selected-print-count').textContent = selectedForDelete.size;
+  document.getElementById('print-selected-btn').disabled = selectedForDelete.size === 0;
 }
 
 function renderResults(){
@@ -1485,6 +1488,14 @@ document.getElementById('cleanup-numbers-btn').addEventListener('click', ()=>{
 document.getElementById('print-all-btn').addEventListener('click', ()=>{
   const nums = Object.keys(students).sort(compareStudentNum);
   if(nums.length===0){ alert('저장된 학생이 없습니다.'); return; }
+  const html = nums.map(num=>renderPrintSheet(num, students[num], validateStudent(num, students[num]))).join('');
+  document.getElementById('print-sheet').innerHTML = html;
+  window.print();
+});
+
+document.getElementById('print-selected-btn').addEventListener('click', ()=>{
+  const nums = Object.keys(students).filter(n=>selectedForDelete.has(n)).sort(compareStudentNum);
+  if(nums.length===0){ alert('먼저 인쇄할 학생을 체크하세요.'); return; }
   const html = nums.map(num=>renderPrintSheet(num, students[num], validateStudent(num, students[num]))).join('');
   document.getElementById('print-sheet').innerHTML = html;
   window.print();
