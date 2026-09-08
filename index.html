@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>고입 원서 검증기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --paper:#F6F5F0;
+    --panel:#FFFFFF;
+    --ink:#16242E;
+    --ink-soft:#4C5A63;
+    --line:#D8D9D1;
+    --teal:#0E5C57;
+    --teal-tint:#E4EEEC;
+    --amber:#8A5A12;
+    --amber-tint:#F3E9D6;
+    --red:#8C3324;
+    --red-tint:#F3E3DD;
+    --ok:#2A6B3F;
+    --ok-tint:#E4EFE6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Noto Sans KR', sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    word-break:keep-all;
+  }
+  header{
+    padding:18px 24px;
+    border-bottom:3px solid var(--ink);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header h1{
+    font-family:'Noto Serif KR', serif;
+    font-size:22px;
+    margin:0;
+  }
+  header .desc{font-size:12.5px;color:var(--ink-soft);}
+
+  nav.tabs{
+    display:flex;
+    gap:2px;
+    padding:0 24px;
+    background:var(--ink);
+  }
+  nav.tabs button{
+    background:transparent;
+    border:none;
+    color:#B9C2C6;
+    padding:12px 18px;
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:14px;
+    font-weight:500;
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+  }
+  nav.tabs button.active{
+    color:#fff;
+    border-bottom:3px solid var(--teal);
+    background:#20323D;
+  }
+
+  main{padding:20px 24px 60px; max-width:1100px; margin:0 auto;}
+  .tabpane{display:none;}
+  .tabpane.active{display:block;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:18px 20px;
+    margin-bottom:18px;
+  }
+  .panel h2{
+    font-family:'Noto Serif KR',serif;
+    font-size:16px;
+    margin:0 0 12px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--line);
+  }
+  .hint{font-size:12.5px;color:var(--ink-soft);margin:-4px 0 14px;line-height:1.6;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:middle;}
+  th{background:#F0EFE9;font-weight:700;font-size:12.5px;}
+  td input[type=text], td input[type=number]{
+    width:100%;border:1px solid var(--line);padding:5px 6px;font-size:13px;
+    font-family:inherit; background:#fff;
+  }
+  td select{width:100%;padding:5px;font-size:13px;font-family:inherit;}
+
+  button.btn{
+    background:var(--teal);color:#fff;border:none;padding:9px 16px;
+    font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit;
+  }
+  button.btn:hover{background:#0A4844;}
+  button.btn.secondary{background:#fff;color:var(--teal);border:1px solid var(--teal);}
+  button.btn.secondary:hover{background:var(--teal-tint);}
+  button.btn.danger{background:#fff;color:var(--red);border:1px solid var(--red);}
+  button.btn:disabled{background:#B9BCB4;cursor:not-allowed;}
+
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+
+  #dropzone{
+    border:2px dashed var(--line);
+    padding:30px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:13.5px;
+    cursor:pointer;
+    background:#FBFAF7;
+  }
+  #dropzone.drag{border-color:var(--teal);color:var(--teal);background:var(--teal-tint);}
+  #preview-img{max-width:100%;max-height:360px;display:block;margin:10px auto;border:1px solid var(--line);}
+
+  .field-grid{display:grid;grid-template-columns:110px 1fr;gap:8px 10px;align-items:center;margin-bottom:8px;}
+  .region2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px 16px;}
+  .region2-grid .cell{display:flex;align-items:center;gap:7px;font-size:12px;}
+  .region2-grid .cell span{
+    width:20px;height:20px;min-width:20px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--teal-tint);color:var(--teal);
+    border-radius:50%;font-weight:700;font-size:11px;
+    flex-shrink:0;
+  }
+  .region2-grid .cell input{flex:1;min-width:0;}
+
+  .flags{margin-top:6px;}
+  .flag{
+    display:block;
+    font-size:12px;
+    padding:4px 8px;
+    margin-bottom:4px;
+    border-left:3px solid var(--red);
+    background:var(--red-tint);
+    color:var(--red);
+  }
+  .flag.warn{border-color:var(--amber);background:var(--amber-tint);color:var(--amber);}
+  .flag.info{border-color:var(--ink-soft);background:#EFEEE9;color:var(--ink-soft);}
+  .flag.ok{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
+
+  .status-pill{
+    display:inline-block;padding:2px 9px;font-size:11.5px;font-weight:700;border-radius:2px;
+  }
+  .status-pill.ok{background:var(--ok-tint);color:var(--ok);}
+  .status-pill.warn{background:var(--amber-tint);color:var(--amber);}
+  .status-pill.err{background:var(--red-tint);color:var(--red);}
+
+  #api-key-note{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .small{font-size:12px;color:var(--ink-soft);}
+  .schoollist-note{font-size:12px;color:var(--ink-soft);margin-top:8px;line-height:1.7;}
+
+  /* ============ 인쇄용 확인표 ============ */
+  #print-sheet{display:none;}
+  .ps-page{
+    font-family:'Noto Sans KR', sans-serif; color:var(--ink);
+    width:210mm; min-height:297mm; box-sizing:border-box; padding:14mm 15mm;
+    background:#fff; margin:0 auto 10px;
+  }
+  .ps-title{font-family:'Noto Serif KR',serif; font-weight:700; font-size:18px; margin:0 0 10px;}
+  .ps-header{display:flex; flex-wrap:wrap; gap:6px 22px; border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:14px; font-size:13px;}
+  .ps-cols{display:grid; grid-template-columns:1fr 1.7fr; gap:18px; align-items:start;}
+  .ps-col h4{font-family:'Noto Serif KR',serif; font-size:13px; border-bottom:1px solid var(--line); padding-bottom:4px; margin:0 0 6px;}
+  .ps-row{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:4px 6px; border-left:3px solid transparent; font-size:12.5px; margin-bottom:2px;}
+  .ps-row.ps-err{border-left-color:var(--red); background:var(--red-tint);}
+  .ps-row.ps-warn{border-left-color:var(--amber); background:var(--amber-tint);}
+  .ps-row.ps-info{border-left-color:var(--ink-soft); background:#EFEEE9;}
+  .ps-num{font-weight:700; min-width:18px; color:var(--ink-soft);}
+  .ps-school{flex:1; min-width:60px;}
+  .ps-bubble{flex-basis:100%; font-size:11px; padding:3px 8px; border-radius:10px; margin-top:2px;}
+  .ps-bubble::before{content:'▶ ';}
+  .ps-bubble.ps-err{background:var(--red-tint); color:var(--red);}
+  .ps-bubble.ps-warn{background:var(--amber-tint); color:var(--amber);}
+  .ps-bubble.ps-info{background:#EFEEE9; color:var(--ink-soft);}
+  .ps-general{margin-top:16px; border:1px dashed var(--ink); padding:10px 14px; font-size:12.5px;}
+  .ps-general ul{margin:6px 0 0; padding-left:18px;}
+  .ps-general li.err{color:var(--red);}
+  .ps-general li.warn{color:var(--amber);}
+  .ps-general li.info{color:var(--ink-soft);}
+  .ps-caution{margin-top:12px; border:1px dashed var(--red); color:var(--red); padding:10px 14px; font-size:12px; line-height:1.7;}
+  .ps-caution b{font-family:'Noto Serif KR',serif; display:block; margin-bottom:4px;}
+  @media print{
+    body > *:not(#print-sheet){ display:none !important; }
+    #print-sheet{ display:block !important; margin:0; }
+    .ps-page{ page-break-after:always; margin:0; width:auto; min-height:auto; }
+    .ps-page:last-child{ page-break-after:auto; }
+    @page{ size:A4; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>고입 원서 검증기</h1>
+    <div class="desc">성남학군 2027학년도 입학 희망원(2차) · 스캔 인식 &amp; 자동 검증</div>
+  </div>
+  <div class="desc">데이터는 이 브라우저에만 저장됩니다 (localStorage)</div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="setup" class="active">① 설정 (성별 · 마감 예상)</button>
+  <button data-tab="scan">② 원서 스캔 인식</button>
+  <button data-tab="results">③ 검증 결과</button>
+</nav>
+
+<main>
+
+  <!-- ===================== TAB 1: SETUP ===================== -->
+  <section class="tabpane active" id="tab-setup">
+
+    <div class="panel">
+      <h2>학생 번호별 성별</h2>
+      <div class="hint">원서 용지에는 성별 표시가 없어서 별도로 입력합니다. 학생 번호(예: 3-2-15)를 입력하고 성별을 선택하세요. 남고(성남고·성일고)·여고(성남여고·분당영덕여고) 기재 여부를 검증할 때 사용됩니다.</div>
+      <table id="gender-table">
+        <thead><tr><th style="width:35%">학생 번호</th><th style="width:25%">성별</th><th style="width:15%"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn secondary" id="add-gender-row">+ 학생 추가</button>
+        <button class="btn secondary" id="import-gender-btn">엑셀/CSV로 일괄 업로드</button>
+        <button class="btn secondary" id="download-gender-template-btn">빈 양식 내려받기</button>
+        <input type="file" id="import-gender-file" accept=".xlsx,.xls,.csv" style="display:none;">
+        <span class="small" id="import-gender-status"></span>
+      </div>
+      <div class="small" style="margin-top:6px;">형식: A열 = 반, B열 = 번호, C열 = 성별(남/여). 학년은 모두 3학년으로 자동 처리되어 "3-반-번호" 형태의 학생 번호로 저장됩니다. 제목 줄이 있어도 자동으로 건너뜁니다. 이미 있는 학생 번호는 새 값으로 덮어씁니다.</div>
+    </div>
+
+    <div class="panel">
+      <h2>학교별 예상 마감 지망순위</h2>
+      <div class="hint">
+        선생님이 직접 확보한 자료(예상치)를 입력하세요. <b>모르는 학교는 빈칸으로 두면 "정보 없음"으로 처리되어</b> 전략 검증(6번 항목)에서 자동으로 제외됩니다 — 억지로 채울 필요 없습니다.<br>
+        정원이 성별에 따라 다르므로 <b>남 / 여</b>를 구분해서 입력합니다. 남고·여고처럼 한쪽 성별만 지원 가능한 학교는 반대쪽 칸이 자동으로 비활성화됩니다.
+      </div>
+      <table id="rank-table">
+        <thead><tr><th style="width:16%">구역</th><th style="width:34%">학교</th><th style="width:25%">남 예상 마감 지망</th><th style="width:25%">여 예상 마감 지망</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn secondary" id="save-ranks">저장</button>
+        <span class="small" id="rank-save-msg"></span>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <button class="btn secondary" id="import-rank-btn">엑셀/CSV로 일괄 업로드</button>
+        <button class="btn secondary" id="download-rank-template-btn">빈 양식 내려받기 (학교 목록 포함)</button>
+        <input type="file" id="import-rank-file" accept=".xlsx,.xls,.csv" style="display:none;">
+        <span class="small" id="import-rank-status"></span>
+      </div>
+      <div class="small" style="margin-top:6px;">형식: A열 = 학교명(목록 표기와 정확히 일치, 예: 낙생고), B열 = 남 예상 마감 지망, C열 = 여 예상 마감 지망. 모르거나 해당 없는 칸은 비워두거나 "x"로 두면 "정보 없음"으로 처리됩니다. 목록에 없는 학교명은 무시됩니다.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Google Gemini API 키</h2>
+      <div class="hint">
+        원서 이미지를 인식하려면 Google Gemini API 키가 필요합니다. <b>aistudio.google.com/apikey</b>에서 결제(유료) 등급으로 발급받은 키를 사용합니다. 유료 등급은 무료 등급과 달리 분당/일일 요청 수 제한이 사실상 여유로워 인식 요청이 대기 없이 바로바로 처리됩니다.<br>
+        키는 이 브라우저에만 저장되며, 인식 요청을 보낼 때만 이미지와 함께 Google 서버로 전송됩니다.
+      </div>
+      <div class="row">
+        <input type="text" id="api-key-input" placeholder="AIzaSy..." style="flex:1;min-width:260px;padding:8px;border:1px solid var(--line);font-family:inherit;">
+        <button class="btn secondary" id="save-api-key">저장</button>
+      </div>
+      <div id="api-key-note"></div>
+    </div>
+
+  </section>
+
+  <!-- ===================== TAB 2: SCAN ===================== -->
+  <section class="tabpane" id="tab-scan">
+    <div class="panel">
+      <h2>원서 이미지/PDF 업로드</h2>
+      <div class="hint">이미지(jpg, png 등)와 PDF 모두 올릴 수 있습니다. 여러 학생의 원서가 한 PDF에 여러 페이지로 들어있으면 됩니다.<br>이름을 미리 가리지 않고 올려도 됩니다. 올린 뒤 아래 미리보기에서 <b>마우스로 드래그해서 이름 부분을 검게 가려주세요</b>. 검게 칠한 부분은 서버로 전송되는 이미지 자체에서 지워진 뒤에만 인식 요청이 전송되므로, 이름 원본 픽셀은 Google 서버로 나가지 않습니다. 학생 번호(학년-반-번)는 가리지 마세요.</div>
+      <div id="dropzone">이미지 또는 PDF를 여기로 끌어놓거나 클릭해서 선택하세요</div>
+      <input type="file" id="file-input" accept="image/*,.pdf,application/pdf" style="display:none;">
+      <div id="pdf-nav-wrap" class="row" style="display:none; justify-content:center; margin-top:10px;">
+        <button class="btn secondary" id="pdf-prev-page" type="button">◀ 이전 페이지</button>
+        <span class="small" id="pdf-page-label" style="min-width:110px; text-align:center;"></span>
+        <button class="btn secondary" id="pdf-next-page" type="button">다음 페이지 ▶</button>
+      </div>
+      <div id="mask-wrap" style="display:none;">
+        <div class="row" style="justify-content:space-between;">
+          <span class="small">드래그해서 이름 위치를 가리세요. 위치는 자동 저장되어 다음 이미지/페이지에도 그대로 적용됩니다.</span>
+          <button class="btn secondary" id="clear-mask-btn" type="button">가리기 위치 초기화</button>
+        </div>
+        <canvas id="preview-canvas" style="max-width:100%;max-height:420px;display:block;margin:8px auto;border:1px solid var(--line);cursor:crosshair;background:#eee;"></canvas>
+        <div class="small" id="mask-note"></div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" id="recognize-btn" disabled>이 페이지만 인식하기</button>
+        <button class="btn" id="batch-validate-btn" disabled style="background:var(--red); border-color:var(--red);">일괄 검증 (전체 페이지 자동 처리)</button>
+        <button class="btn danger" id="batch-cancel-btn" style="display:none;">중단</button>
+      </div>
+      <div class="hint" style="margin:6px 0 0;">가리기 위치만 맞춰두고 <b>"일괄 검증"</b>을 누르면, 지금 올린 파일의 모든 페이지(PDF면 전체 페이지, 이미지면 이 1장)를 자동으로 인식해서 바로 저장합니다. 저장된 내용은 검증 결과 탭에서 바로 확인·수정할 수 있습니다.</div>
+      <div class="small" id="recognize-status" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="panel" id="review-panel" style="display:none;">
+      <h2>인식 결과 확인 · 수정</h2>
+      <div class="hint">손글씨 인식은 틀릴 수 있습니다. 저장 전에 꼭 원본 이미지와 대조해서 확인하세요.</div>
+
+      <div class="field-grid">
+        <label>학생 번호</label>
+        <input type="text" id="f-student-number" placeholder="예: 3-2-15">
+        <label>1지망 특목고 여부</label>
+        <label style="font-weight:400;"><input type="checkbox" id="f-is-special"> 1지망이 외고·국제고·자사고임</label>
+      </div>
+
+      <h3 style="font-size:13.5px;margin:14px 0 6px;">학군내 (1~5지망)</h3>
+      <div class="region2-grid" id="region1-inputs"></div>
+
+      <h3 style="font-size:13.5px;margin:14px 0 6px;">구역내 (1~19지망, 안 쓴 칸은 비워두기)</h3>
+      <div class="region2-grid" id="region2-inputs"></div>
+
+      <h3 style="font-size:13.5px;margin:14px 0 6px;">특이사항 (오른쪽 체크박스 칸)</h3>
+      <div class="hint" style="margin-bottom:6px;">체크된 항목이 있으면 한 줄에 하나씩 적으세요 (예: "교직원(행정직 포함) 자녀 타교 배정 지원 (분당고등학교)"). 체크된 게 없거나 "해당 없음"만 체크된 경우 비워두세요.</div>
+      <textarea id="f-special-notes" rows="3" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);font-family:inherit;font-size:13px;"></textarea>
+
+      <div class="row" style="margin-top:16px;">
+        <button class="btn" id="save-record-btn">저장</button>
+        <button class="btn secondary" id="cancel-review-btn">취소</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB 3: RESULTS ===================== -->
+  <section class="tabpane" id="tab-results">
+    <div class="panel">
+      <h2>저장된 학생 검증 결과</h2>
+      <div class="row">
+        <button class="btn secondary" id="revalidate-btn">재검증</button>
+        <button class="btn secondary" id="cleanup-numbers-btn">학생 번호 정리</button>
+        <button class="btn secondary" id="export-csv-btn">CSV로 내보내기</button>
+        <button class="btn secondary" id="print-all-btn">전체 인쇄용 확인표</button>
+        <span class="small" id="results-count"></span>
+      </div>
+      <div class="hint" style="margin-top:-6px;">성별표나 마감 지망순위, 학생 정보를 나중에 고친 뒤 이 탭에 그대로 있는 상태라면 "재검증"을 눌러 최신 값으로 다시 확인하세요. 탭을 벗어났다가 돌아오면 자동으로 다시 확인됩니다. 학생 번호가 "3학년 7반 16번"처럼 다르게 표시되거나 성별을 찾지 못하는 경우 "학생 번호 정리"를 눌러 "3-7-16" 형태로 통일하세요.</div>
+      <div class="row" style="margin-top:6px;">
+        <label class="small" style="display:flex; align-items:center; gap:4px; font-weight:500;"><input type="checkbox" id="select-all-results"> 전체 선택</label>
+        <button class="btn danger" id="delete-selected-btn" disabled>선택 삭제 (<span id="selected-count">0</span>)</button>
+      </div>
+      <div id="results-list"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="print-sheet"></div>
+
+<script>
+/* ============ 학교 마스터 데이터 ============ */
+const REGION1_SCHOOLS = ["동광고","복정고","숭신고","위례한빛고","풍생고","효성고","성남고","성일고","성남여고"];
+const REGION2_SCHOOLS = ["낙생고","늘푸른고","돌마고","보평고","분당고","분당대진고","불곡고","서현고","송림고","수내고","야탑고","운중고","이매고","태원고","판교고","한솔고","분당영덕여고"];
+const ALL_SCHOOLS = REGION1_SCHOOLS.concat(REGION2_SCHOOLS);
+const GENDER_ONLY_SCHOOLS = {
+  "성남고":"남","성일고":"남","성남여고":"여","분당영덕여고":"여"
+};
+// 특목고(외고·국제고)·전국단위 자사고 + 안산동산고(광역단위 자사고, 경기도 거주 학생 지원 가능).
+// 1지망에 이 목록의 학교를 쓴 경우가 "특목·자사고 지원"이며, 성남학군 26개 일반고와는 별도로 취급한다.
+const SPECIAL_SCHOOLS = [
+  // 경기도 외고 (8)
+  "경기외고","고양외고","과천외고","김포외고","동두천외고","성남외고","수원외고","안양외고",
+  // 경기도 국제고 (3)
+  "고양국제고","동탄국제고","청심국제고",
+  // 전국단위 자사고 (10)
+  "하나고","용인외대부고","민족사관고","상산고","북일고","김천고","포항제철고","광양제철고","인천하늘고","현대청운고",
+  // 광역단위 자사고 (경기도 거주 학생 지원 가능)
+  "안산동산고"
+];
+
+/* ============ 학교명 퍼지 매칭 ============ */
+// "보평고등학교" -> "보평고", "대진" -> "분당대진고" 처럼 OCR/수기 입력 표기를
+// 목록의 정식 학교명으로 자동 매칭한다.
+function buildSchoolIndex(list){ return list.map(name => ({ name, core: name.replace(/고$/,'') })); }
+const SCHOOL_INDEX = buildSchoolIndex(ALL_SCHOOLS);
+const SPECIAL_SCHOOL_INDEX = buildSchoolIndex(SPECIAL_SCHOOLS);
+function normalizeRawSchoolText(raw){
+  let s = String(raw||'').trim().replace(/\s+/g,'');
+  if(!s) return '';
+  s = s.replace(/외국어고등학교$/,'외고')
+       .replace(/여자고등학교$/,'여고')
+       .replace(/고등학교$/,'고')
+       .replace(/여자고$/,'여고')
+       .replace(/외국어고$/,'외고');
+  return s;
+}
+// returns { matched: canonicalName|null, ambiguous:boolean, candidates:[names] }
+// list/index를 받아 그 목록 안에서만 찾는다. 방향성 있는 부분일치만 허용:
+// 입력이 실제 학교명 core의 "일부(축약)"일 때만 매칭하고(예: "대진"->"분당대진고"),
+// 반대로 입력이 더 길어서 실제 core를 우연히 포함하는 경우는 매칭하지 않는다
+// (예: "성남외고"가 "성남고"의 core "성남"을 포함한다고 해서 잘못 매칭되는 것을 방지).
+function matchNameAgainst(raw, list, index){
+  const norm = normalizeRawSchoolText(raw);
+  if(!norm) return { matched:null, ambiguous:false, candidates:[] };
+  if(list.includes(norm)) return { matched:norm, ambiguous:false, candidates:[norm] };
+  const inputCore = norm.replace(/고$/,'');
+  if(inputCore.length < 2) return { matched:null, ambiguous:false, candidates:[] }; // 너무 짧으면 오매칭 위험이 커서 시도하지 않음
+  const candidates = [...new Set(
+    index.filter(sc => sc.core.includes(inputCore)).map(sc=>sc.name)
+  )];
+  if(candidates.length === 1) return { matched:candidates[0], ambiguous:false, candidates };
+  if(candidates.length > 1) return { matched:null, ambiguous:true, candidates };
+  return { matched:null, ambiguous:false, candidates:[] };
+}
+function matchSchoolName(raw){ return matchNameAgainst(raw, ALL_SCHOOLS, SCHOOL_INDEX); }
+function matchSpecialSchoolName(raw){ return matchNameAgainst(raw, SPECIAL_SCHOOLS, SPECIAL_SCHOOL_INDEX); }
+// 1지망 텍스트만 보고 "특목·자사고 지원"인지 추측한다. 특목 목록에 매칭되면 true,
+// 일반 26개교 목록에 매칭되면 false. 어느 쪽에도 안 걸리면(오인식 등) 함부로 "특목"으로
+// 단정하지 않고 false로 두어 "목록에 없음" 오류로 남긴다 — 그래야 선생님이 직접 확인한다.
+function guessIsSpecial(region1FirstRaw){
+  const s = (region1FirstRaw||'').trim();
+  if(!s) return false;
+  if(SPECIAL_SCHOOLS.includes(s)) return true;
+  if(ALL_SCHOOLS.includes(s)) return false;
+  if(matchSpecialSchoolName(s).matched) return true;
+  return false;
+}
+
+/* ============ localStorage helpers ============ */
+const LS_KEYS = { GENDERS:"hsval_genders", RANKS:"hsval_ranks", STUDENTS:"hsval_students", APIKEY:"hsval_apikey", MASKBOX:"hsval_maskbox" };
+function lsGet(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } }
+function lsSet(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+// 학생 번호를 "학년-반-번호" 형태(예: 3-2-15)로 정규화한다. 전각 숫자, 다른 종류의 대시,
+// 공백, 앞자리 0("05"→5) 등 표기 차이 때문에 같은 학생인데 다른 키로 저장되어(예: 성별표엔
+// "3-2-5"인데 스캔 인식은 "3-2-05"로 나오는 경우) "성별 미입력"으로 잘못 뜨는 문제를 막는다.
+function normalizeStudentNumber(raw){
+  let s = String(raw==null?'':raw).trim();
+  if(!s) return '';
+  s = s.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)); // 전각 숫자 -> 반각
+  s = s.replace(/[－ー―–—]/g, '-'); // 여러 종류의 대시 -> 하이픈
+  s = s.replace(/\s+/g, '');
+  const nums = s.match(/\d+/g);
+  if(nums && nums.length >= 3){
+    return `${parseInt(nums[0],10)}-${parseInt(nums[1],10)}-${parseInt(nums[2],10)}`;
+  }
+  return s; // 패턴이 다르면(숫자 3덩어리가 아니면) 원본을 그대로 사용
+}
+// 기존에 저장된 데이터 중 정규화된 키와 다르게 저장된 항목을 한 번 정리한다(같은 학생이
+// 서로 다른 키로 흩어져 있던 걸 병합). 값이 겹치면 나중 항목이 우선한다.
+function migrateKeysToNormalized(obj){
+  let changed = false;
+  const result = {};
+  Object.keys(obj).forEach(k=>{
+    const nk = normalizeStudentNumber(k);
+    if(nk !== k) changed = true;
+    result[nk] = obj[k];
+  });
+  return { result, changed };
+}
+
+let genders = lsGet(LS_KEYS.GENDERS, {});      // { "3-2-15": "남" }
+let ranks   = lsGet(LS_KEYS.RANKS, {});        // { "낙생고": {boy: 1, girl: 2} }
+let students= lsGet(LS_KEYS.STUDENTS, {});     // { "3-2-15": {region1:[], region2:[], isSpecial:bool} }
+{
+  const gm = migrateKeysToNormalized(genders);
+  if(gm.changed){ genders = gm.result; lsSet(LS_KEYS.GENDERS, genders); }
+  const sm = migrateKeysToNormalized(students);
+  if(sm.changed){ students = sm.result; lsSet(LS_KEYS.STUDENTS, students); }
+}
+
+/* ============ Tabs ============ */
+function switchTab(name){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+name));
+  if(name === 'results') renderResults();
+}
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
+});
+
+/* ============ TAB 1: gender table ============ */
+function renderGenderTable(){
+  const tbody = document.querySelector('#gender-table tbody');
+  tbody.innerHTML = '';
+  const nums = Object.keys(genders).sort(compareStudentNum);
+  nums.forEach(num=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${num}" data-role="num" data-orig="${num}"></td>
+      <td><select data-role="gender">
+            <option value="남" ${genders[num]==='남'?'selected':''}>남</option>
+            <option value="여" ${genders[num]==='여'?'selected':''}>여</option>
+          </select></td>
+      <td><button class="btn danger" data-role="del">삭제</button></td>`;
+    tbody.appendChild(tr);
+
+    tr.querySelector('[data-role=num]').addEventListener('change', e=>{
+      const orig = e.target.dataset.orig, val = normalizeStudentNumber(e.target.value);
+      if(!val){ e.target.value = orig; return; }
+      const g = genders[orig]; delete genders[orig]; genders[val] = g;
+      e.target.value = val;
+      e.target.dataset.orig = val;
+      lsSet(LS_KEYS.GENDERS, genders);
+    });
+    tr.querySelector('[data-role=gender]').addEventListener('change', e=>{
+      genders[tr.querySelector('[data-role=num]').dataset.orig] = e.target.value;
+      lsSet(LS_KEYS.GENDERS, genders);
+    });
+    tr.querySelector('[data-role=del]').addEventListener('click', ()=>{
+      delete genders[tr.querySelector('[data-role=num]').dataset.orig];
+      lsSet(LS_KEYS.GENDERS, genders);
+      renderGenderTable();
+    });
+  });
+}
+document.getElementById('add-gender-row').addEventListener('click', ()=>{
+  let base = '새 학생', i = 1, key = base;
+  while(genders[key] !== undefined){ key = base + i; i++; }
+  genders[key] = '남';
+  lsSet(LS_KEYS.GENDERS, genders);
+  renderGenderTable();
+});
+
+/* ============ Excel/CSV helpers (shared) ============ */
+function downloadCSV(rows, filename){
+  const csv = rows.map(r=>r.map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(["\uFEFF"+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function readSpreadsheetRows(file, callback){
+  if(typeof XLSX === 'undefined'){ callback(new Error('엑셀 처리 라이브러리를 불러오지 못했습니다 (인터넷 연결을 확인하세요).')); return; }
+  const isCsvLike = /\.(csv|txt)$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const buf = e.target.result;
+      let wb;
+      if(isCsvLike){
+        // 한셀/한글 등 국산 오피스는 CSV를 EUC-KR(CP949)로 저장하는 경우가 많음.
+        // 먼저 UTF-8로 디코딩해보고, 한글이 제대로 안 보이면 EUC-KR로 다시 디코딩.
+        let text = safeDecode(buf, 'utf-8');
+        if(looksBroken(text)) text = safeDecode(buf, 'euc-kr');
+        wb = XLSX.read(text, {type:'string'});
+      } else {
+        wb = XLSX.read(new Uint8Array(buf), {type:'array'});
+      }
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      callback(null, rows);
+    }catch(err){ callback(err); }
+  };
+  reader.onerror = ()=>callback(new Error('파일을 읽을 수 없습니다.'));
+  reader.readAsArrayBuffer(file);
+}
+function safeDecode(buf, encoding){
+  try{ return new TextDecoder(encoding).decode(buf); }catch(e){ return ''; }
+}
+function looksBroken(text){
+  if(!text) return true;
+  if(text.indexOf('\uFFFD') !== -1) return true; // 디코딩 실패 문자
+  const hangulCount = (text.match(/[\uAC00-\uD7A3]/g)||[]).length;
+  return hangulCount === 0; // 한글이 하나도 안 보이면 인코딩이 잘못됐을 가능성이 큼
+}
+function normalizeGender(v){
+  const s = String(v==null?'':v).trim();
+  if(!s) return null;
+  const low = s.toLowerCase();
+  if(s.startsWith('남') || low==='m' || low==='male') return '남';
+  if(s.startsWith('여') || low==='f' || low==='female') return '여';
+  return null;
+}
+function cleanIntStr(v){
+  const s = String(v==null?'':v).trim();
+  if(!s) return '';
+  const m = s.match(/^(\d+)(\.0+)?$/); // strip trailing .0 that Excel sometimes adds to numeric cells
+  return m ? m[1] : s;
+}
+function compareStudentNum(a, b){
+  // "3-7-1" vs "3-7-10": compare each '-' separated part numerically, not as text,
+  // so 1,2,...,9,10,11 sorts correctly instead of 1,10,11,...,2,3.
+  const pa = String(a).split('-'), pb = String(b).split('-');
+  const len = Math.max(pa.length, pb.length);
+  for(let i=0;i<len;i++){
+    const sa = pa[i] ?? '', sb = pb[i] ?? '';
+    const na = Number(sa), nb = Number(sb);
+    const bothNum = sa!=='' && sb!=='' && !isNaN(na) && !isNaN(nb);
+    if(bothNum){
+      if(na !== nb) return na - nb;
+    } else {
+      const c = sa.localeCompare(sb, 'ko');
+      if(c !== 0) return c;
+    }
+  }
+  return 0;
+}
+
+/* ============ TAB 1: bulk import — gender ============ */
+document.getElementById('download-gender-template-btn').addEventListener('click', ()=>{
+  downloadCSV([['반','번호','성별'],['2','15','남']], '학생_성별_양식.csv');
+});
+document.getElementById('import-gender-btn').addEventListener('click', ()=>{
+  document.getElementById('import-gender-file').click();
+});
+document.getElementById('import-gender-file').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('import-gender-status');
+  statusEl.textContent = '읽는 중...';
+  readSpreadsheetRows(file, (err, rows)=>{
+    e.target.value = '';
+    if(err){ statusEl.textContent = '읽기 실패: ' + err.message; return; }
+    let added = 0, skipped = 0;
+    rows.forEach(row=>{
+      const banRaw = row[0], numRaw = row[1], genderRaw = row[2];
+      const ban = cleanIntStr(banRaw);
+      const beon = cleanIntStr(numRaw);
+      if(!ban && !beon && !genderRaw) return; // fully blank row
+      const g = normalizeGender(genderRaw);
+      if(!ban || !beon || !g){ skipped++; return; }
+      const num = normalizeStudentNumber(`3-${ban}-${beon}`);
+      genders[num] = g;
+      added++;
+    });
+    lsSet(LS_KEYS.GENDERS, genders);
+    renderGenderTable();
+    statusEl.textContent = `${added}명 반영` + (skipped ? `, ${skipped}행은 인식 불가(제목 줄 포함)로 건너뜀` : '');
+  });
+});
+
+/* ============ TAB 1: rank table ============ */
+function renderRankTable(){
+  const tbody = document.querySelector('#rank-table tbody');
+  tbody.innerHTML = '';
+  ALL_SCHOOLS.forEach(sch=>{
+    const region = REGION1_SCHOOLS.includes(sch) ? '1구역' : '2구역';
+    const r = ranks[sch] || {};
+    const restrict = GENDER_ONLY_SCHOOLS[sch]; // '남' | '여' | undefined
+    const boyDisabled = restrict === '여';
+    const girlDisabled = restrict === '남';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${region}</td>
+      <td>${sch}</td>
+      <td><input type="number" min="1" placeholder="${boyDisabled?'해당없음':'정보없음'}" data-school="${sch}" data-gender="boy" value="${r.boy ?? ''}" ${boyDisabled?'disabled':''}></td>
+      <td><input type="number" min="1" placeholder="${girlDisabled?'해당없음':'정보없음'}" data-school="${sch}" data-gender="girl" value="${r.girl ?? ''}" ${girlDisabled?'disabled':''}></td>`;
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('save-ranks').addEventListener('click', ()=>{
+  ranks = {};
+  document.querySelectorAll('#rank-table input').forEach(inp=>{
+    const sch = inp.dataset.school, gender = inp.dataset.gender, val = inp.value.trim();
+    if(!ranks[sch]) ranks[sch] = {};
+    ranks[sch][gender] = val ? parseInt(val,10) : null;
+  });
+  lsSet(LS_KEYS.RANKS, ranks);
+  document.getElementById('rank-save-msg').textContent = '저장됨';
+  setTimeout(()=>document.getElementById('rank-save-msg').textContent='', 1500);
+});
+
+/* ============ TAB 1: bulk import — expected closing ranks ============ */
+document.getElementById('download-rank-template-btn').addEventListener('click', ()=>{
+  const rows = [['학교','남 예상 마감 지망','여 예상 마감 지망']];
+  ALL_SCHOOLS.forEach(s=>{
+    const restrict = GENDER_ONLY_SCHOOLS[s];
+    rows.push([s, restrict==='여' ? 'x' : '', restrict==='남' ? 'x' : '']);
+  });
+  downloadCSV(rows, '학교별_마감예상_양식.csv');
+});
+document.getElementById('import-rank-btn').addEventListener('click', ()=>{
+  document.getElementById('import-rank-file').click();
+});
+document.getElementById('import-rank-file').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('import-rank-status');
+  statusEl.textContent = '읽는 중...';
+  readSpreadsheetRows(file, (err, rows)=>{
+    e.target.value = '';
+    if(err){ statusEl.textContent = '읽기 실패: ' + err.message; return; }
+    let updated = 0;
+    const unmatched = [];
+    rows.forEach(row=>{
+      const name = String(row[0]==null?'':row[0]).trim();
+      if(!name || !ALL_SCHOOLS.includes(name)){
+        if(name && name !== '학교' && name !== '학교명') unmatched.push(name);
+        return;
+      }
+      const boyTxt = String(row[1]==null?'':row[1]).trim();
+      const girlTxt = String(row[2]==null?'':row[2]).trim();
+      const boy = boyTxt ? parseInt(boyTxt,10) : null;   // "x" or blank -> NaN/empty -> null (정보없음)
+      const girl = girlTxt ? parseInt(girlTxt,10) : null;
+      ranks[name] = { boy: (boy!=null && !isNaN(boy)) ? boy : null, girl: (girl!=null && !isNaN(girl)) ? girl : null };
+      updated++;
+    });
+    lsSet(LS_KEYS.RANKS, ranks);
+    renderRankTable();
+    let msg = `${updated}개교 반영 (빈칸/"x"는 정보 없음으로 처리됨)`;
+    if(unmatched.length) msg += `, 목록에 없는 학교명 ${unmatched.length}개 무시(${unmatched.slice(0,3).join(', ')}${unmatched.length>3?' 등':''})`;
+    statusEl.textContent = msg;
+  });
+});
+
+/* ============ TAB 1: API key ============ */
+const savedKey = lsGet(LS_KEYS.APIKEY, '');
+if(savedKey){
+  document.getElementById('api-key-input').value = savedKey;
+  document.getElementById('api-key-note').textContent = '저장된 키가 있습니다.';
+}
+document.getElementById('save-api-key').addEventListener('click', ()=>{
+  const val = document.getElementById('api-key-input').value.trim();
+  lsSet(LS_KEYS.APIKEY, val);
+  document.getElementById('api-key-note').textContent = val ? '저장됨' : '';
+});
+
+/* ============ TAB 2: upload, mask & recognize ============ */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const maskWrap = document.getElementById('mask-wrap');
+const canvas = document.getElementById('preview-canvas');
+const ctx = canvas.getContext('2d');
+const maskNote = document.getElementById('mask-note');
+const recognizeBtn = document.getElementById('recognize-btn');
+const pdfNavWrap = document.getElementById('pdf-nav-wrap');
+const pdfPageLabel = document.getElementById('pdf-page-label');
+
+if(typeof pdfjsLib !== 'undefined'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+let originalImage = null;   // full-resolution Image object, never sent as-is
+let maskBox = null;         // {x,y,w,h} in the image's native pixel coords
+let savedMaskFraction = lsGet(LS_KEYS.MASKBOX, null); // {x,y,w,h} as 0~1 fractions, reused across images
+let pdfDoc = null, pdfPageNum = 1; // set when the uploaded file is a multi/single-page PDF
+
+dropzone.addEventListener('click', ()=>fileInput.click());
+dropzone.addEventListener('dragover', e=>{e.preventDefault(); dropzone.classList.add('drag');});
+dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e=>{
+  e.preventDefault(); dropzone.classList.remove('drag');
+  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e=>{
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+function handleFile(file){
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if(isPdf){ handlePdfFile(file); return; }
+  pdfDoc = null;
+  pdfNavWrap.style.display = 'none';
+  const reader = new FileReader();
+  reader.onload = ()=> loadImageFromDataUrl(reader.result);
+  reader.readAsDataURL(file);
+}
+
+function loadImageFromDataUrl(dataUrl){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      originalImage = img;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      if(savedMaskFraction){
+        maskBox = {
+          x: savedMaskFraction.x * canvas.width,
+          y: savedMaskFraction.y * canvas.height,
+          w: savedMaskFraction.w * canvas.width,
+          h: savedMaskFraction.h * canvas.height
+        };
+        maskNote.textContent = '이전에 저장된 가리기 위치를 적용했습니다. 안 맞으면 다시 드래그하세요.';
+      } else {
+        maskBox = null;
+        maskNote.textContent = '아직 가리기 위치가 없습니다. 이름 위에 드래그해서 가려주세요.';
+      }
+      drawCanvas();
+      maskWrap.style.display = 'block';
+      recognizeBtn.disabled = false;
+      document.getElementById('batch-validate-btn').disabled = false;
+      document.getElementById('review-panel').style.display = 'none';
+      resolve();
+    };
+    img.src = dataUrl;
+  });
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = ()=>reject(new Error('파일을 읽을 수 없습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePdfFile(file){
+  const statusEl = document.getElementById('recognize-status');
+  if(typeof pdfjsLib === 'undefined'){
+    statusEl.textContent = 'PDF 처리 라이브러리를 불러오지 못했습니다 (인터넷 연결을 확인하세요).';
+    return;
+  }
+  statusEl.textContent = 'PDF 불러오는 중...';
+  try{
+    const buf = await file.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+    pdfPageNum = 1;
+    pdfNavWrap.style.display = pdfDoc.numPages > 1 ? 'flex' : 'none';
+    await renderPdfPage(pdfPageNum);
+    statusEl.textContent = '';
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = 'PDF를 읽는 중 오류: ' + err.message;
+  }
+}
+
+async function renderPdfPage(num){
+  const page = await pdfDoc.getPage(num);
+  const viewport = page.getViewport({ scale: 2.2 }); // 2.2x for legible handwriting without huge file size
+  const off = document.createElement('canvas');
+  off.width = viewport.width;
+  off.height = viewport.height;
+  await page.render({ canvasContext: off.getContext('2d'), viewport }).promise;
+  loadImageFromDataUrl(off.toDataURL('image/png'));
+  pdfPageLabel.textContent = `페이지 ${num} / ${pdfDoc.numPages}`;
+}
+
+document.getElementById('pdf-prev-page').addEventListener('click', async ()=>{
+  if(!pdfDoc || pdfPageNum <= 1) return;
+  pdfPageNum--;
+  await renderPdfPage(pdfPageNum);
+});
+document.getElementById('pdf-next-page').addEventListener('click', async ()=>{
+  if(!pdfDoc || pdfPageNum >= pdfDoc.numPages) return;
+  pdfPageNum++;
+  await renderPdfPage(pdfPageNum);
+});
+
+function drawCanvas(){
+  if(!originalImage) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(originalImage,0,0);
+  if(maskBox && maskBox.w > 1 && maskBox.h > 1){
+    ctx.fillStyle = '#000';
+    ctx.fillRect(maskBox.x, maskBox.y, maskBox.w, maskBox.h);
+    ctx.setLineDash([6,4]);
+    ctx.strokeStyle = '#e04b3a';
+    ctx.lineWidth = Math.max(2, canvas.width/300);
+    ctx.strokeRect(maskBox.x, maskBox.y, maskBox.w, maskBox.h);
+    ctx.setLineDash([]);
+  }
+}
+
+function canvasPoint(evt){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const cx = (evt.touches ? evt.touches[0].clientX : evt.clientX);
+  const cy = (evt.touches ? evt.touches[0].clientY : evt.clientY);
+  return { x:(cx-rect.left)*scaleX, y:(cy-rect.top)*scaleY };
+}
+function rectFrom(a,b){
+  return { x:Math.min(a.x,b.x), y:Math.min(a.y,b.y), w:Math.abs(a.x-b.x), h:Math.abs(a.y-b.y) };
+}
+
+let dragStart = null, dragging = false;
+function startDrag(e){ if(!originalImage) return; e.preventDefault(); dragging = true; dragStart = canvasPoint(e); }
+function moveDrag(e){
+  if(!dragging) return;
+  e.preventDefault();
+  maskBox = rectFrom(dragStart, canvasPoint(e));
+  drawCanvas();
+}
+function endDrag(){
+  if(!dragging) return;
+  dragging = false;
+  if(maskBox && maskBox.w > 2 && maskBox.h > 2){
+    savedMaskFraction = {
+      x: maskBox.x / canvas.width, y: maskBox.y / canvas.height,
+      w: maskBox.w / canvas.width, h: maskBox.h / canvas.height
+    };
+    lsSet(LS_KEYS.MASKBOX, savedMaskFraction);
+    maskNote.textContent = '가리기 위치가 저장되었습니다. 다음 이미지에도 자동 적용됩니다.';
+  }
+}
+canvas.addEventListener('mousedown', startDrag);
+canvas.addEventListener('mousemove', moveDrag);
+window.addEventListener('mouseup', endDrag);
+canvas.addEventListener('touchstart', startDrag, {passive:false});
+canvas.addEventListener('touchmove', moveDrag, {passive:false});
+canvas.addEventListener('touchend', endDrag);
+
+document.getElementById('clear-mask-btn').addEventListener('click', ()=>{
+  maskBox = null;
+  savedMaskFraction = null;
+  lsSet(LS_KEYS.MASKBOX, null);
+  drawCanvas();
+  maskNote.textContent = '가리기 위치를 초기화했습니다. 다시 드래그해주세요.';
+});
+
+const RECOGNIZE_PROMPT = `이 이미지는 한국 경기도 고등학교 입학 희망원(2차) 양식이다. 표는 세 부분으로 되어 있다:
+- 왼쪽 "학군내(1단계)": 지망순위 1~5의 5칸 (학교명 기재)
+- 가운데 "구역내(2단계)": 지망순위 1~19의 최대 19칸 (학교명 기재, 안 쓴 칸은 비어있음)
+- 오른쪽 "해당하는 곳에 체크(v)해 주세요" 칸: 아래 항목들에 체크박스(□)가 있고, 일부만 체크(v, ✓, ■로 칠함 등)되어 있다:
+  예술고 희망(희망고 기재), 특성화고 희망(희망고 기재), 쌍둥이 학생 동일교 배정 희망(학번·이름 기재),
+  교직원(행정직 포함) 자녀 타교 배정 지원(학부모 근무 학교명 기재), 3연년생 학생 동일교 배정 희망,
+  국가유공자 자녀, 특례입학대상자, 지체장애인 선배정, 체육특기자 선배정, 해당 없음
+상단 중앙에는 "O학년 O반 O번" 형태의 학생 번호가 있다(이름은 가려져 있음, 이름은 무시할 것).
+
+이미지를 보고 아래 JSON 형식으로만 답하라. 다른 설명, 마크다운 코드블록 없이 순수 JSON만 출력하라:
+{
+  "student_number": "학생 번호를 보이는 그대로 (예: 3-2-15). 읽을 수 없으면 빈 문자열",
+  "region1": ["1지망학교","2지망학교","3지망학교","4지망학교","5지망학교"],
+  "region2": ["1지망학교","2지망학교", ... 최대 19개, 안 쓴 칸은 빈 문자열 ""],
+  "special_notes": ["실제로 체크(v)된 항목만 문구 그대로, 옆에 손글씨로 채운 내용(희망고·학교명·학번이름 등)이 있으면 괄호로 덧붙여서. 예: [\\"교직원(행정직 포함) 자녀 타교 배정 지원 (분당고등학교)\\"]. '해당 없음'이 체크된 경우와 아무것도 체크 안 된 경우는 둘 다 빈 배열 []로."]
+}
+학교명은 정확히 "OO고" 형태로, 손글씨를 최대한 정확히 그대로 옮겨 적어라. 확실하지 않으면 가장 비슷한 글자를 적되 임의로 지어내지 마라.`;
+
+// Sends whatever is currently drawn on the mask canvas to the API and returns the parsed
+// {student_number, region1, region2} object. Throws on any failure.
+async function recognizeCurrentCanvas(){
+  const apiKey = lsGet(LS_KEYS.APIKEY, '');
+
+  // Export the CANVAS (which already has the mask baked in) at full resolution.
+  // The original unmasked pixels under maskBox never leave the browser.
+  const dataUrl = canvas.toDataURL('image/png');
+  const currentImageBase64 = dataUrl.split(',')[1];
+  const currentImageMediaType = 'image/png';
+
+  const GEMINI_MODEL = "gemini-3.6-flash";
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey
+    },
+    body: JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [
+          { inline_data: { mime_type: currentImageMediaType, data: currentImageBase64 } },
+          { text: RECOGNIZE_PROMPT }
+        ]
+      }],
+      generationConfig: { responseMimeType: "application/json" }
+    })
+  });
+  const data = await response.json();
+  if(data.error){
+    throw new Error(`[${data.error.status || data.error.code || response.status}] ${data.error.message || JSON.stringify(data.error)}`);
+  }
+  const candidate = (data.candidates || [])[0];
+  if(!candidate){
+    throw new Error('Gemini 응답에 결과가 없습니다. finishReason: ' + JSON.stringify(data.promptFeedback || data));
+  }
+  const text = (candidate.content?.parts || []).map(p=>p.text||"").join("").trim();
+  const clean = text.replace(/```json|```/g,"").trim();
+  return JSON.parse(clean);
+}
+
+// 유료 API로 전환되어 요청 제한이 없으므로, 대기·재시도 없이 바로 호출합니다.
+// (batch-cancel-btn으로 진행 중 중단하는 기능은 아래 배치 루프의 batchCancelled 플래그가 담당합니다.)
+async function recognizeCurrentCanvasWithRetry(statusLabel){
+  return await recognizeCurrentCanvas();
+}
+
+recognizeBtn.addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('recognize-status');
+  if(!originalImage){ statusEl.textContent = '이미지를 먼저 올려주세요.'; return; }
+  if(!maskBox || maskBox.w <= 2 || maskBox.h <= 2){
+    if(!confirm('이름을 가리는 영역이 지정되지 않았습니다. 이미지가 가려지지 않은 상태로 전송됩니다. 계속할까요?')) return;
+  }
+  recognizeBtn.disabled = true;
+  statusEl.textContent = '인식 중...';
+  try{
+    const parsed = await recognizeCurrentCanvasWithRetry('인식 중');
+    openReviewPanel(parsed);
+    statusEl.textContent = '인식 완료. 아래에서 검토하세요.';
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '인식 실패: ' + err.message;
+  }finally{
+    recognizeBtn.disabled = false;
+  }
+});
+
+/* ============ 일괄 검증 (지금 올린 파일의 모든 페이지를 자동 처리) ============ */
+let batchCancelled = false;
+// 유료 API 사용 중이라 페이지 사이 대기 시간 없이 바로바로 다음 페이지로 넘어갑니다.
+
+async function processCurrentCanvasIntoStudents(label, failItems){
+  try{
+    const parsed = await recognizeCurrentCanvasWithRetry(label);
+    const num = normalizeStudentNumber(parsed.student_number);
+    if(!num){ failItems.push(`${label}: 학생 번호를 인식하지 못함 (직접 확인 필요)`); return; }
+    const region1 = (parsed.region1 || []).concat(["","","","",""]).slice(0,5);
+    const region2 = (parsed.region2 || []).slice();
+    while(region2.length < 19) region2.push("");
+    const isSpecial = guessIsSpecial(region1[0]);
+    const specialNotes = Array.isArray(parsed.special_notes) ? parsed.special_notes.filter(s=>s && String(s).trim()).map(s=>String(s).trim()) : [];
+    students[num] = { region1, region2, isSpecial, specialNotes };
+    lsSet(LS_KEYS.STUDENTS, students);
+  }catch(err){
+    failItems.push(`${label}: ${err.message}`);
+  }
+}
+
+document.getElementById('batch-validate-btn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('recognize-status');
+  if(!originalImage && !pdfDoc){ statusEl.textContent = '먼저 이미지나 PDF를 올려주세요.'; return; }
+  if(!maskBox || maskBox.w <= 2 || maskBox.h <= 2){
+    if(!confirm('이름을 가리는 영역이 지정되지 않았습니다. 이 상태로 진행하면 이름이 가려지지 않은 채 전송됩니다. 계속할까요?')) return;
+  }
+  batchCancelled = false;
+  const batchBtn = document.getElementById('batch-validate-btn');
+  const cancelBtn = document.getElementById('batch-cancel-btn');
+  recognizeBtn.disabled = true;
+  batchBtn.disabled = true;
+  cancelBtn.style.display = 'inline-block';
+
+  let done = 0;
+  const failItems = [];
+
+  if(pdfDoc){
+    const total = pdfDoc.numPages;
+    for(let p=1; p<=total && !batchCancelled; p++){
+      statusEl.textContent = `처리 중: 페이지 ${p}/${total} (완료 ${done}건)`;
+      try{
+        await renderPdfPage(p); // also keeps the on-screen preview/mask in sync with progress
+        await processCurrentCanvasIntoStudents(`페이지 ${p}`, failItems);
+      }catch(err){
+        failItems.push(`페이지 ${p}: ${err.message}`);
+      }
+      done++;
+    }
+  } else {
+    statusEl.textContent = '처리 중...';
+    await processCurrentCanvasIntoStudents('업로드한 이미지', failItems);
+    done++;
+  }
+
+  recognizeBtn.disabled = false;
+  batchBtn.disabled = false;
+  cancelBtn.style.display = 'none';
+  statusEl.textContent = (batchCancelled ? `중단됨 — ` : `일괄 검증 완료 — `) +
+    `${done}건 처리, 실패/확인필요 ${failItems.length}건.` +
+    (failItems.length ? ' ' + failItems.join(' / ') : ' 검증 결과 탭에서 확인하세요.');
+});
+
+document.getElementById('batch-cancel-btn').addEventListener('click', ()=>{ batchCancelled = true; });
+
+/* ============ Review panel ============ */
+let reviewMode = 'new';        // 'new' | 'editSaved'
+let reviewOriginalKey = null;  // student number this record was filed under before editing (for rename handling)
+
+function openReviewPanel(data, opts){
+  opts = opts || {};
+  reviewMode = opts.mode || 'new';
+  reviewOriginalKey = opts.originalKey || null;
+
+  document.getElementById('review-panel').style.display = 'block';
+  document.getElementById('f-student-number').value = data.student_number || '';
+
+  const region1 = (data.region1 || []).concat(["","","","",""]).slice(0,5);
+  const isSpecial = (opts.isSpecial !== undefined) ? opts.isSpecial : guessIsSpecial(region1[0]);
+  document.getElementById('f-is-special').checked = isSpecial;
+
+  const notesArr = Array.isArray(data.specialNotes) ? data.specialNotes : (Array.isArray(data.special_notes) ? data.special_notes : []);
+  document.getElementById('f-special-notes').value = notesArr.join('\n');
+
+  const r1box = document.getElementById('region1-inputs');
+  r1box.innerHTML = '';
+  region1.forEach((val,i)=>{
+    r1box.insertAdjacentHTML('beforeend', `<div class="cell"><span>${i+1}</span><input type="text" data-r1="${i}" value="${val||''}"></div>`);
+  });
+
+  const region2 = (data.region2 || []).slice();
+  while(region2.length < 19) region2.push("");
+  const r2box = document.getElementById('region2-inputs');
+  r2box.innerHTML = '';
+  region2.slice(0,19).forEach((val,i)=>{
+    r2box.insertAdjacentHTML('beforeend', `<div class="cell"><span>${i+1}</span><input type="text" data-r2="${i}" value="${val||''}"></div>`);
+  });
+
+  document.getElementById('save-record-btn').textContent =
+    reviewMode === 'editSaved' ? '수정 내용 저장' : '저장';
+
+  document.getElementById('review-panel').scrollIntoView({behavior:'smooth'});
+}
+
+document.getElementById('cancel-review-btn').addEventListener('click', ()=>{
+  document.getElementById('review-panel').style.display = 'none';
+  reviewMode = 'new';
+  reviewOriginalKey = null;
+});
+
+document.getElementById('save-record-btn').addEventListener('click', async ()=>{
+  const num = normalizeStudentNumber(document.getElementById('f-student-number').value);
+  if(!num){ alert('학생 번호를 입력하세요.'); return; }
+  const region1 = Array.from(document.querySelectorAll('[data-r1]')).sort((a,b)=>a.dataset.r1-b.dataset.r1).map(i=>i.value.trim());
+  const region2 = Array.from(document.querySelectorAll('[data-r2]')).sort((a,b)=>a.dataset.r2-b.dataset.r2).map(i=>i.value.trim());
+  const isSpecial = document.getElementById('f-is-special').checked;
+  const specialNotes = document.getElementById('f-special-notes').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const record = { region1, region2, isSpecial, specialNotes };
+
+  document.getElementById('review-panel').style.display = 'none';
+
+  // 대기열 없이 항상 바로 저장(검증 결과 탭에 즉시 반영)합니다.
+  if(reviewOriginalKey && reviewOriginalKey !== num) delete students[reviewOriginalKey];
+  students[num] = record;
+  lsSet(LS_KEYS.STUDENTS, students);
+
+  const wasNew = reviewMode === 'new';
+  reviewMode = 'new'; reviewOriginalKey = null;
+
+  if(wasNew && pdfDoc && pdfPageNum < pdfDoc.numPages){
+    // Multi-page PDF: move straight to the next page for the next student.
+    pdfPageNum++;
+    await renderPdfPage(pdfPageNum);
+    document.getElementById('recognize-status').textContent = num + ' 저장 완료. 다음 페이지로 이동했습니다.';
+  } else {
+    document.getElementById('recognize-status').textContent = num + ' 저장 완료 (검증 결과 탭에서 확인).';
+    if(wasNew){
+      maskWrap.style.display = 'none';
+      pdfNavWrap.style.display = 'none';
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      originalImage = null;
+      maskBox = null;
+      pdfDoc = null;
+      recognizeBtn.disabled = true;
+      document.getElementById('batch-validate-btn').disabled = true;
+    }
+  }
+});
+
+/* ============ Validation logic ============ */
+function expectedRegion2Length(gender, isSpecial){
+  if(isSpecial) return gender === '여' ? 18 : 17;
+  return gender === '여' ? 17 : 16;
+}
+
+function validateStudent(num, rec){
+  const flags = [];
+  const gender = genders[num] || null;
+  const rawRegion1 = (rec.region1 || []).concat(["","","","",""]).slice(0,5);
+  const rawRegion2raw = (rec.region2 || []);
+
+  // 학교명 자동 매칭 ("보평고등학교"→"보평고", "대진"→"분당대진고" 등).
+  // isSpecial 학생은 1지망(학군내)·1지망(구역내)이 특목·자사고이므로 그 목록에서 매칭한다.
+  function canonicalizeList(list, region){
+    return list.map((raw,i)=>{
+      const s = (raw||'').trim();
+      if(!s) return s;
+      const isSpecialSlot = (i===0 && rec.isSpecial);
+      const targetList = isSpecialSlot ? SPECIAL_SCHOOLS : ALL_SCHOOLS;
+      if(targetList.includes(s)) return s;
+      const m = isSpecialSlot ? matchSpecialSchoolName(s) : matchSchoolName(s);
+      if(m.matched){
+        return m.matched; // 조용히 정식 명칭으로 교체 (별도 안내 메시지는 띄우지 않음)
+      }
+      if(m.ambiguous){
+        flags.push({level:'warn', msg:`${region==='r1'?'학군내':'구역내'} ${i+1}지망 "${s}"이(가) 여러 학교(${m.candidates.join(', ')})와 비슷해 자동 매칭하지 못했습니다. 직접 확인해주세요.`, slot:{region, index:i}});
+      }
+      return s;
+    });
+  }
+
+  const region1 = canonicalizeList(rawRegion1, 'r1');
+  const region2raw = canonicalizeList(rawRegion2raw, 'r2');
+  const region2 = region2raw.filter(s=>s && s.trim()!=='');
+
+  // check for gaps (blank followed by filled) in region2raw
+  let sawBlank = false, hasGap = false;
+  region2raw.forEach(s=>{
+    if(!s || s.trim()===''){ sawBlank = true; }
+    else if(sawBlank){ hasGap = true; }
+  });
+  if(hasGap) flags.push({level:'warn', msg:'구역내 지망 순서 중간에 빈 칸이 있습니다. 순서를 확인하세요.'});
+
+  if(!gender){
+    flags.push({level:'warn', msg:'성별이 입력되지 않았습니다 (① 설정 탭에서 입력).'});
+  }
+
+  // Rule 2: 학군내 5개, 중복 없음, 목록 내 학교 (1지망은 특목이면 특목 목록 기준)
+  const r1nonempty = region1.filter(s=>s && s.trim()!=='');
+  if(r1nonempty.length !== 5){
+    flags.push({level:'err', msg:`학군내 지망이 ${r1nonempty.length}개 입력됨 (5개여야 함).`});
+  }
+  const r1dupSet = new Set();
+  region1.forEach((s,i)=>{
+    if(!s) return;
+    if(r1dupSet.has(s)) flags.push({level:'err', msg:`학군내 지망 중복: ${s}`, slot:{region:'r1', index:i}});
+    r1dupSet.add(s);
+    const isFirst = i===0;
+    const validList = (isFirst && rec.isSpecial) ? SPECIAL_SCHOOLS : ALL_SCHOOLS;
+    if(!validList.includes(s)){
+      const msg = (isFirst && rec.isSpecial)
+        ? `학군내 1지망 "${s}"이(가) 특목·자사고 목록에 없습니다.`
+        : `학군내 ${i+1}지망 "${s}"이(가) 성남학군 학교 목록에 없습니다.`;
+      flags.push({level:'err', msg, slot:{region:'r1', index:i}});
+    }
+  });
+
+  // Rule 3: 구역내 - 2구역 학교만, 중복 없음, 개수 확인 (1지망은 특목이면 특목 목록 기준)
+  const expectedLen = gender ? expectedRegion2Length(gender, rec.isSpecial) : null;
+  if(expectedLen !== null && region2.length !== expectedLen){
+    flags.push({level:'warn', msg:`구역내 지망 개수가 ${region2.length}개 (예상 ${expectedLen}개: ${rec.isSpecial?'특목':'일반'}·${gender}).`});
+    if(region2.length < expectedLen){
+      // 성별상 지원 가능한 2구역 학교 전체 목록 중, 아직 쓰지 않은 학교를 찾아 안내한다.
+      const region2Pool = REGION2_SCHOOLS.filter(s=>{
+        const req = GENDER_ONLY_SCHOOLS[s];
+        return !req || req === gender;
+      });
+      const written = rec.isSpecial ? region2.slice(1) : region2.slice();
+      const missingSchools = region2Pool.filter(s=>!written.includes(s));
+      if(missingSchools.length){
+        flags.push({level:'warn', msg:`구역내에 아직 쓰지 않은 학교 (${missingSchools.length}개): ${missingSchools.join(', ')}`});
+      }
+    }
+  }
+  const r2dupSet = new Set();
+  region2raw.forEach((s,i)=>{
+    if(!s) return;
+    if(r2dupSet.has(s)) flags.push({level:'err', msg:`구역내 지망 중복: ${s}`, slot:{region:'r2', index:i}});
+    r2dupSet.add(s);
+    const isFirst = i===0;
+    const validList = (isFirst && rec.isSpecial) ? SPECIAL_SCHOOLS : REGION2_SCHOOLS;
+    if(!validList.includes(s)){
+      const msg = (isFirst && rec.isSpecial)
+        ? `구역내 1지망 "${s}"이(가) 특목·자사고 목록에 없습니다.`
+        : `구역내 ${i+1}지망 "${s}"이(가) 2구역(분당구) 학교가 아닙니다.`;
+      flags.push({level:'err', msg, slot:{region:'r2', index:i}});
+    }
+  });
+
+  // 성별-학교 성별 불일치
+  if(gender){
+    region1.forEach((s,i)=>{
+      if(!s) return;
+      const req = GENDER_ONLY_SCHOOLS[s];
+      if(req && req !== gender){
+        flags.push({level:'err', msg:`"${s}"은(는) ${req}학교인데 학생 성별은 ${gender}입니다.`, slot:{region:'r1', index:i}});
+      }
+    });
+    region2raw.forEach((s,i)=>{
+      if(!s) return;
+      const req = GENDER_ONLY_SCHOOLS[s];
+      if(req && req !== gender){
+        flags.push({level:'err', msg:`"${s}"은(는) ${req}학교인데 학생 성별은 ${gender}입니다.`, slot:{region:'r2', index:i}});
+      }
+    });
+  }
+
+  // Rule 5: 학군내 1지망과 구역내 1지망은 보통 같은 학교(실제로 가장 가고 싶은 학교)를
+  // 쓰므로, 둘 다 채워져 있는데 서로 다르면 오류로 표시한다.
+  if(region1[0] && region2[0] && region1[0] !== region2[0]){
+    flags.push({level:'err', msg:`학군내 1지망 "${region1[0]}"과(와) 구역내 1지망 "${region2[0]}"이(가) 다릅니다. 보통 같은(가장 가고 싶은) 학교를 씁니다 — 확인이 필요합니다.`, slot:{region:'r2', index:0}});
+  }
+
+  // Rule 6: 전략 검토
+  // (a) 구역내 2~3지망에 학군내 1지망(마감 예상)을 재기재
+  [1,2].forEach(idx=>{
+    if(region2[idx] && region2[idx] === region1[0]){
+      flags.push({level:'warn', msg:`구역내 ${idx+1}지망에 학군내 1지망(마감 예상 학교) "${region2[idx]}"을 다시 썼습니다. 전략상 재검토 필요.`, slot:{region:'r2', index:idx}});
+    }
+  });
+  // (b) 마감 예상 순위 데이터 기반 검토 (선생님이 입력한 경우만, 성별에 맞는 값 사용)
+  const genderKey = gender === '여' ? 'girl' : (gender === '남' ? 'boy' : null);
+  region1.slice(1,5).forEach((s,i)=>{
+    if(!s) return;
+    const r = ranks[s];
+    const val = (r && genderKey) ? r[genderKey] : null;
+    const position = i + 2; // 학군내 이 학교가 적힌 지망 순번 (2~5)
+    if(!val) return;
+    // 1지망 마감 학교 = 어느 순번에 써도 확실히 조기 마감되므로 경고하지 않음.
+    // 2지망 마감 학교 = 5지망에 쓴 경우만 안전(그때까지 확실히 마감), 2~4지망이면 경고.
+    // 3지망 이상 마감 학교 = 학군내 어느 순번에 써도 마감이 확실하지 않으므로 항상 경고.
+    const shouldWarn = val === 1 ? false : (val === 2 ? position !== 5 : true);
+    if(shouldWarn){
+      flags.push({level:'warn', msg:`학군내 ${position}지망 "${s}"의 예상 마감은 ${val}지망 — 이 순번까지 확실히 마감된다고 보기 어려워 탈락 전략에 안 맞을 수 있습니다.`, slot:{region:'r1', index:i+1}});
+    }
+  });
+  [1,2].forEach(idx=>{
+    const s = region2[idx];
+    if(!s) return;
+    const r = ranks[s];
+    const val = (r && genderKey) ? r[genderKey] : null;
+    if(val === 1){
+      flags.push({level:'warn', msg:`구역내 ${idx+1}지망 "${s}"은 1지망에서 마감 예상 — 2~3지망 자리로는 부적합할 수 있습니다.`, slot:{region:'r2', index:idx}});
+    }
+  });
+
+  if(flags.filter(f=>f.level==='err').length===0 && flags.filter(f=>f.level==='warn').length===0){
+    flags.push({level:'ok', msg:'기본 검증 통과.'});
+  }
+  return flags;
+}
+
+/* ============ TAB 3: results ============ */
+let selectedForDelete = new Set();
+
+function updateDeleteSelectedUI(){
+  document.getElementById('selected-count').textContent = selectedForDelete.size;
+  document.getElementById('delete-selected-btn').disabled = selectedForDelete.size === 0;
+}
+
+function renderResults(){
+  const container = document.getElementById('results-list');
+  const nums = Object.keys(students).sort(compareStudentNum);
+  document.getElementById('results-count').textContent = `총 ${nums.length}명`;
+  // 삭제된 학생이 선택 목록에 남아있지 않도록 정리
+  selectedForDelete.forEach(n=>{ if(!students[n]) selectedForDelete.delete(n); });
+  const selectAllCb = document.getElementById('select-all-results');
+
+  if(nums.length === 0){
+    container.innerHTML = '<p class="small">아직 저장된 학생이 없습니다. ② 원서 스캔 인식 탭에서 추가하세요.</p>';
+    selectAllCb.checked = false;
+    selectAllCb.disabled = true;
+    updateDeleteSelectedUI();
+    return;
+  }
+  selectAllCb.disabled = false;
+  selectAllCb.checked = nums.every(n=>selectedForDelete.has(n));
+
+  container.innerHTML = '';
+  nums.forEach(num=>{
+    const rec = students[num];
+    const flags = validateStudent(num, rec);
+    const errCount = flags.filter(f=>f.level==='err').length;
+    const warnCount = flags.filter(f=>f.level==='warn').length;
+    const pillClass = errCount>0 ? 'err' : (warnCount>0 ? 'warn' : 'ok');
+    const pillText = errCount>0 ? `오류 ${errCount}` : (warnCount>0 ? `확인필요 ${warnCount}` : '통과');
+    const noteBadges = (rec.specialNotes||[]).map(n=>`<span class="small" style="background:var(--amber-tint);color:var(--amber);border-radius:10px;padding:2px 8px;margin-left:4px;">${n}</span>`).join('');
+
+    const div = document.createElement('div');
+    div.className = 'panel';
+    div.style.marginBottom = '12px';
+    div.innerHTML = `
+      <div class="row" style="justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <input type="checkbox" class="row-select" data-num="${num}" ${selectedForDelete.has(num)?'checked':''}>
+          <b>${num}</b> <span class="small">${rec.isSpecial?'(특목 지원)':''} 성별: ${genders[num]||'미입력'}</span>${noteBadges}
+        </div>
+        <div><span class="status-pill ${pillClass}">${pillText}</span>
+             <button class="btn secondary" data-print="${num}" style="margin-left:8px;">인쇄용 확인표</button>
+             <button class="btn secondary" data-edit="${num}" style="margin-left:8px;">수정</button>
+             <button class="btn danger" data-del="${num}" style="margin-left:8px;">삭제</button></div>
+      </div>
+      <div class="small" style="margin:8px 0;">학군내: ${rec.region1.filter(s=>s).join(' · ') || '(없음)'}</div>
+      <div class="small" style="margin:8px 0;">구역내: ${rec.region2.filter(s=>s).join(' · ') || '(없음)'}</div>
+      <div class="flags">${flags.map(f=>`<span class="flag ${f.level}">${f.msg}</span>`).join('')}</div>
+    `;
+    container.appendChild(div);
+  });
+
+  container.querySelectorAll('.row-select').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) selectedForDelete.add(cb.dataset.num);
+      else selectedForDelete.delete(cb.dataset.num);
+      selectAllCb.checked = nums.every(n=>selectedForDelete.has(n));
+      updateDeleteSelectedUI();
+    });
+  });
+  container.querySelectorAll('[data-print]').forEach(btn=>{
+    btn.addEventListener('click', ()=> printStudentSheet(btn.dataset.print));
+  });
+  container.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const num = btn.dataset.edit;
+      const rec = students[num];
+      switchTab('scan');
+      openReviewPanel({student_number:num, region1:rec.region1, region2:rec.region2, specialNotes:rec.specialNotes}, {mode:'editSaved', originalKey:num, isSpecial:rec.isSpecial});
+    });
+  });
+  container.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(confirm(btn.dataset.del + ' 기록을 삭제할까요?')){
+        delete students[btn.dataset.del];
+        selectedForDelete.delete(btn.dataset.del);
+        lsSet(LS_KEYS.STUDENTS, students);
+        renderResults();
+      }
+    });
+  });
+  updateDeleteSelectedUI();
+}
+
+document.getElementById('select-all-results').addEventListener('change', (e)=>{
+  const nums = Object.keys(students);
+  if(e.target.checked) nums.forEach(n=>selectedForDelete.add(n));
+  else selectedForDelete.clear();
+  renderResults();
+});
+
+document.getElementById('delete-selected-btn').addEventListener('click', ()=>{
+  const count = selectedForDelete.size;
+  if(count === 0) return;
+  if(!confirm(`선택한 ${count}명의 기록을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+  selectedForDelete.forEach(num=>{ delete students[num]; });
+  lsSet(LS_KEYS.STUDENTS, students);
+  selectedForDelete.clear();
+  renderResults();
+});
+
+/* ============ 인쇄용 확인표 ============ */
+function renderPrintSheet(num, rec, flags){
+  const gender = genders[num] || '미입력';
+  const region1 = (rec.region1||[]).concat(["","","","",""]).slice(0,5);
+  const region2 = (rec.region2||[]).slice();
+  while(region2.length < 19) region2.push("");
+
+  const r1Flags = Array.from({length:5}, ()=>[]);
+  const r2Flags = Array.from({length:19}, ()=>[]);
+  const general = [];
+  flags.forEach(f=>{
+    if(f.level === 'ok') return;
+    if(f.slot && f.slot.region==='r1' && r1Flags[f.slot.index]) r1Flags[f.slot.index].push(f);
+    else if(f.slot && f.slot.region==='r2' && r2Flags[f.slot.index]) r2Flags[f.slot.index].push(f);
+    else general.push(f);
+  });
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function rowHtml(list, region, idx){
+    const val = list[idx] || '';
+    const fs = (region==='r1'?r1Flags:r2Flags)[idx];
+    const worst = fs.some(f=>f.level==='err') ? 'err' : fs.some(f=>f.level==='warn') ? 'warn' : (fs.length?'info':'');
+    const rowClass = worst ? `ps-row ps-${worst}` : 'ps-row';
+    const bubble = fs.length ? `<div class="ps-bubble ps-${worst}">${fs.map(f=>esc(f.msg)).join('<br>')}</div>` : '';
+    return `<div class="${rowClass}"><span class="ps-num">${idx+1}</span><span class="ps-school">${esc(val)||'&nbsp;'}</span>${bubble}</div>`;
+  }
+
+  const r1Rows = region1.map((_,i)=>rowHtml(region1,'r1',i)).join('');
+  const r2Rows = region2.map((_,i)=>rowHtml(region2,'r2',i)).join('');
+  const generalHtml = general.length
+    ? `<div class="ps-general"><b>종합 확인사항</b><ul>${general.map(f=>`<li class="${f.level}">${esc(f.msg)}</li>`).join('')}</ul></div>`
+    : '';
+  const cautionHtml = `<div class="ps-caution"><b>주의사항</b>이 확인표는 스캔 이미지의 손글씨를 AI로 자동 인식한 결과이며, 인식 오류가 있을 수 있습니다. 표시된 "마감 예상 지망" 관련 안내는 확정된 정보가 아니라 주위에 도는 소문이나 선생님이 참고로 입력한 예측치일 뿐이며, 실제 배정 결과와 다를 수 있습니다. 제출 전 반드시 원본 원서와 대조하여 확인하시고, 최종 지망 순서는 소문이나 추측이 아니라 <b style="display:inline;">본인의 판단</b>으로 결정하는 것이며, 그에 따른 배정 결과의 책임 또한 <b style="display:inline;">본인에게</b> 있습니다.</div>`;
+
+  return `
+    <div class="ps-page">
+      <div class="ps-title">고입 원서 검증 확인표</div>
+      <div class="ps-header">
+        <div><b>학생 번호</b> ${esc(num)}</div>
+        <div><b>성별</b> ${esc(gender)}</div>
+        ${rec.isSpecial ? `<div><b>특목·자사고 지원</b> 예</div>` : ''}
+        ${(rec.specialNotes||[]).map(n=>`<div><b>특이사항</b> ${esc(n)}</div>`).join('')}
+      </div>
+      <div class="ps-cols">
+        <div class="ps-col">
+          <h4>학군내 (1~5지망)</h4>
+          ${r1Rows}
+          ${generalHtml}
+          ${cautionHtml}
+        </div>
+        <div class="ps-col"><h4>구역내 (1~19지망)</h4>${r2Rows}</div>
+      </div>
+    </div>`;
+}
+function printStudentSheet(num){
+  const rec = students[num];
+  if(!rec){ return; }
+  const flags = validateStudent(num, rec);
+  document.getElementById('print-sheet').innerHTML = renderPrintSheet(num, rec, flags);
+  window.print();
+}
+document.getElementById('revalidate-btn').addEventListener('click', ()=>{
+  renderResults();
+  document.getElementById('results-count').textContent += ' — 재검증 완료';
+});
+document.getElementById('cleanup-numbers-btn').addEventListener('click', ()=>{
+  const gm = migrateKeysToNormalized(genders);
+  const sm = migrateKeysToNormalized(students);
+  if(gm.changed){ genders = gm.result; lsSet(LS_KEYS.GENDERS, genders); }
+  if(sm.changed){ students = sm.result; lsSet(LS_KEYS.STUDENTS, students); }
+  renderGenderTable();
+  renderResults();
+  const fixedCount = (gm.changed?1:0) + (sm.changed?1:0);
+  document.getElementById('results-count').textContent += fixedCount>0
+    ? ' — 학생 번호 정리 완료 (표기가 다르던 항목을 통일했습니다)'
+    : ' — 정리할 항목이 없습니다 (이미 통일되어 있음)';
+});
+document.getElementById('print-all-btn').addEventListener('click', ()=>{
+  const nums = Object.keys(students).sort(compareStudentNum);
+  if(nums.length===0){ alert('저장된 학생이 없습니다.'); return; }
+  const html = nums.map(num=>renderPrintSheet(num, students[num], validateStudent(num, students[num]))).join('');
+  document.getElementById('print-sheet').innerHTML = html;
+  window.print();
+});
+
+document.getElementById('export-csv-btn').addEventListener('click', ()=>{
+  const nums = Object.keys(students).sort(compareStudentNum);
+  const rows = [['학생번호','성별','특목여부','특이사항','학군내지망','구역내지망','검증결과']];
+  nums.forEach(num=>{
+    const rec = students[num];
+    const flags = validateStudent(num, rec);
+    const errCount = flags.filter(f=>f.level==='err').length;
+    const resultText = flags.map(f=>`[${f.level}] ${f.msg}`).join(' / ');
+    rows.push([
+      num, genders[num]||'', rec.isSpecial?'Y':'N',
+      (rec.specialNotes||[]).join(' / '),
+      rec.region1.filter(s=>s).join(' > '),
+      rec.region2.filter(s=>s).join(' > '),
+      resultText
+    ]);
+  });
+  const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(["\uFEFF"+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '고입원서_검증결과.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ============ init ============ */
+renderGenderTable();
+renderRankTable();
+</script>
+</body>
+</html>
