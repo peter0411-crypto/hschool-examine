@@ -351,6 +351,12 @@
       </div>
       <div id="results-list"></div>
     </div>
+
+    <div class="panel">
+      <h2>1지망 통계 (참고용)</h2>
+      <div class="hint">현재 저장된 학생들의 1지망 학교별 인원 수입니다. 검증과는 무관한 단순 참고 자료입니다.</div>
+      <div id="first-choice-stats"></div>
+    </div>
   </section>
 
 </main>
@@ -1354,10 +1360,41 @@ function updateDeleteSelectedUI(){
   document.getElementById('print-selected-btn').disabled = selectedForDelete.size === 0;
 }
 
+function renderFirstChoiceStats(){
+  const container = document.getElementById('first-choice-stats');
+  const nums = Object.keys(students);
+  if(nums.length === 0){ container.innerHTML = '<p class="small">아직 저장된 학생이 없습니다.</p>'; return; }
+
+  const r1Counts = {}, r2Counts = {};
+  nums.forEach(num=>{
+    const rec = students[num];
+    const r1 = (rec.region1||[])[0];
+    const r2 = (rec.region2||[])[0];
+    if(r1 && r1.trim()) r1Counts[r1] = (r1Counts[r1]||0) + 1;
+    if(r2 && r2.trim()) r2Counts[r2] = (r2Counts[r2]||0) + 1;
+  });
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function tableHtml(counts){
+    const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0],'ko'));
+    if(entries.length === 0) return '<p class="small">(집계할 데이터 없음)</p>';
+    const rows = entries.map(([school,count])=>`<tr><td>${esc(school)}</td><td style="text-align:right;">${count}명</td></tr>`).join('');
+    return `<table><thead><tr><th>학교</th><th style="text-align:right;">인원</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  container.innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div><h4 style="font-size:13px;margin:0 0 6px;">학군내 1지망</h4>${tableHtml(r1Counts)}</div>
+      <div><h4 style="font-size:13px;margin:0 0 6px;">구역내 1지망</h4>${tableHtml(r2Counts)}</div>
+    </div>
+  `;
+}
+
 function renderResults(){
   const container = document.getElementById('results-list');
   const nums = Object.keys(students).sort(compareStudentNum);
   document.getElementById('results-count').textContent = `총 ${nums.length}명`;
+  renderFirstChoiceStats();
   // 삭제된 학생이 선택 목록에 남아있지 않도록 정리
   selectedForDelete.forEach(n=>{ if(!students[n]) selectedForDelete.delete(n); });
   const selectAllCb = document.getElementById('select-all-results');
