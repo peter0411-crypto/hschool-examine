@@ -213,6 +213,7 @@
   <button data-tab="setup" class="active">① 설정 (성별 · 마감 예상)</button>
   <button data-tab="scan">② 원서 스캔 인식</button>
   <button data-tab="results">③ 검증 결과</button>
+  <button data-tab="stats">④ 1지망 통계</button>
 </nav>
 
 <main>
@@ -351,7 +352,10 @@
       </div>
       <div id="results-list"></div>
     </div>
+  </section>
 
+  <!-- ===================== TAB 4: STATS ===================== -->
+  <section class="tabpane" id="tab-stats">
     <div class="panel">
       <h2>1지망 통계 (참고용)</h2>
       <div class="hint">현재 저장된 학생들의 1지망 학교별 인원 수입니다. 검증과는 무관한 단순 참고 자료입니다.</div>
@@ -480,6 +484,7 @@ function switchTab(name){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+name));
   if(name === 'results') renderResults();
+  if(name === 'stats') renderFirstChoiceStats();
 }
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
@@ -1584,17 +1589,19 @@ document.getElementById('print-selected-btn').addEventListener('click', ()=>{
 
 document.getElementById('export-csv-btn').addEventListener('click', ()=>{
   const nums = Object.keys(students).sort(compareStudentNum);
-  const rows = [['학생번호','성별','특목여부','특이사항','학군내지망','구역내지망','검증결과']];
+  const r1Headers = Array.from({length:5}, (_,i)=>`학군내${i+1}지망`);
+  const r2Headers = Array.from({length:19}, (_,i)=>`구역내${i+1}지망`);
+  const rows = [['학생번호','성별','특목여부','특이사항', ...r1Headers, ...r2Headers, '검증결과']];
   nums.forEach(num=>{
     const rec = students[num];
     const flags = validateStudent(num, rec);
-    const errCount = flags.filter(f=>f.level==='err').length;
     const resultText = flags.map(f=>`[${f.level}] ${f.msg}`).join(' / ');
+    const r1cols = Array.from({length:5}, (_,i)=>rec.region1[i] || '');
+    const r2cols = Array.from({length:19}, (_,i)=>rec.region2[i] || '');
     rows.push([
       num, genders[num]||'', rec.isSpecial?'Y':'N',
       (rec.specialNotes||[]).join(' / '),
-      rec.region1.filter(s=>s).join(' > '),
-      rec.region2.filter(s=>s).join(' > '),
+      ...r1cols, ...r2cols,
       resultText
     ]);
   });
