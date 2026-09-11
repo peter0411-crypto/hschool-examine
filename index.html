@@ -335,6 +335,12 @@
 
   <!-- ===================== TAB 3: RESULTS ===================== -->
   <section class="tabpane" id="tab-results">
+    <div class="panel" id="missing-scan-panel" style="display:none; background:var(--amber-tint); border:1px solid var(--amber);">
+      <h2 style="color:var(--amber);">스캔 안 된 학생 (<span id="missing-scan-count">0</span>명)</h2>
+      <div class="hint">① 설정 탭의 성별표엔 등록돼 있지만, 아직 원서 스캔·검증 기록이 없는 학생 번호입니다.</div>
+      <div id="missing-scan-list" class="small"></div>
+    </div>
+
     <div class="panel">
       <h2>저장된 학생 검증 결과</h2>
       <div class="row">
@@ -1406,11 +1412,22 @@ function renderFirstChoiceStats(){
   `;
 }
 
+function renderMissingScanList(){
+  const panel = document.getElementById('missing-scan-panel');
+  const registeredNums = Object.keys(genders).sort(compareStudentNum);
+  const missing = registeredNums.filter(n => !students[n]);
+  document.getElementById('missing-scan-count').textContent = missing.length;
+  if(missing.length === 0){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  document.getElementById('missing-scan-list').textContent = missing.join(', ');
+}
+
 function renderResults(){
   const container = document.getElementById('results-list');
   const nums = Object.keys(students).sort(compareStudentNum);
   document.getElementById('results-count').textContent = `총 ${nums.length}명`;
   renderFirstChoiceStats();
+  renderMissingScanList();
   // 삭제된 학생이 선택 목록에 남아있지 않도록 정리
   selectedForDelete.forEach(n=>{ if(!students[n]) selectedForDelete.delete(n); });
   const selectAllCb = document.getElementById('select-all-results');
