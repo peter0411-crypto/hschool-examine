@@ -424,6 +424,17 @@ function matchNameAgainst(raw, list, index){
 }
 function matchSchoolName(raw){ return matchNameAgainst(raw, ALL_SCHOOLS, SCHOOL_INDEX); }
 function matchSpecialSchoolName(raw){ return matchNameAgainst(raw, SPECIAL_SCHOOLS, SPECIAL_SCHOOL_INDEX); }
+// 원본 표기("보평고등학교" 등)를 목록의 정식 명칭("보평고")으로 조용히 통일한다.
+// isSpecialSlot=true면 특목·자사고 목록에서, 아니면 일반 26개교 목록에서 찾는다.
+// 매칭 안 되면(오인식 등) 원본 그대로 반환한다.
+function canonicalizeSchoolName(raw, isSpecialSlot){
+  const s = (raw||'').trim();
+  if(!s) return '';
+  const targetList = isSpecialSlot ? SPECIAL_SCHOOLS : ALL_SCHOOLS;
+  if(targetList.includes(s)) return s;
+  const m = isSpecialSlot ? matchSpecialSchoolName(s) : matchSchoolName(s);
+  return m.matched || s;
+}
 // 1지망 텍스트만 보고 "특목·자사고 지원"인지 추측한다. 특목 목록에 매칭되면 true,
 // 일반 26개교 목록에 매칭되면 false. 어느 쪽에도 안 걸리면(오인식 등) 함부로 "특목"으로
 // 단정하지 않고 false로 두어 "목록에 없음" 오류로 남긴다 — 그래야 선생님이 직접 확인한다.
@@ -1373,10 +1384,10 @@ function renderFirstChoiceStats(){
   const r1Counts = {}, r2Counts = {};
   nums.forEach(num=>{
     const rec = students[num];
-    const r1 = (rec.region1||[])[0];
-    const r2 = (rec.region2||[])[0];
-    if(r1 && r1.trim()) r1Counts[r1] = (r1Counts[r1]||0) + 1;
-    if(r2 && r2.trim()) r2Counts[r2] = (r2Counts[r2]||0) + 1;
+    const r1 = canonicalizeSchoolName((rec.region1||[])[0], rec.isSpecial);
+    const r2 = canonicalizeSchoolName((rec.region2||[])[0], rec.isSpecial);
+    if(r1) r1Counts[r1] = (r1Counts[r1]||0) + 1;
+    if(r2) r2Counts[r2] = (r2Counts[r2]||0) + 1;
   });
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
