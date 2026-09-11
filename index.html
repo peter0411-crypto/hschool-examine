@@ -1279,19 +1279,24 @@ function validateStudent(num, rec){
 
   // Rule 3: 구역내 - 2구역 학교만, 중복 없음, 개수 확인 (1지망은 특목이면 특목 목록 기준)
   const expectedLen = gender ? expectedRegion2Length(gender, rec.isSpecial) : null;
+  // "정상적으로 인정되는" 2구역 지망만 따로 센다. 1구역 학교를 잘못 써 넣은 경우 등은
+  // 전체 칸 수(raw length)엔 포함되지만 유효한 지망으로 치지 않아야, 그 칸 수만 채워져
+  // 있어도 "아직 안 쓴 학교" 안내가 조용히 사라지는 걸 막을 수 있다.
+  const region2RegularWritten = (rec.isSpecial ? region2.slice(1) : region2.slice());
+  const region2ValidWritten = region2RegularWritten.filter(s => REGION2_SCHOOLS.includes(s));
+  const expectedRegularCount = expectedLen !== null ? (expectedLen - (rec.isSpecial ? 1 : 0)) : null;
   if(expectedLen !== null && region2.length !== expectedLen){
     flags.push({level:'warn', msg:`구역내 지망 개수가 ${region2.length}개 (예상 ${expectedLen}개: ${rec.isSpecial?'특목':'일반'}·${gender}).`});
-    if(region2.length < expectedLen){
-      // 성별상 지원 가능한 2구역 학교 전체 목록 중, 아직 쓰지 않은 학교를 찾아 안내한다.
-      const region2Pool = REGION2_SCHOOLS.filter(s=>{
-        const req = GENDER_ONLY_SCHOOLS[s];
-        return !req || req === gender;
-      });
-      const written = rec.isSpecial ? region2.slice(1) : region2.slice();
-      const missingSchools = region2Pool.filter(s=>!written.includes(s));
-      if(missingSchools.length){
-        flags.push({level:'warn', msg:`구역내에 아직 쓰지 않은 학교 (${missingSchools.length}개): ${missingSchools.join(', ')}`});
-      }
+  }
+  if(expectedRegularCount !== null && region2ValidWritten.length < expectedRegularCount){
+    // 성별상 지원 가능한 2구역 학교 전체 목록 중, 아직(유효하게) 안 쓴 학교를 찾아 안내한다.
+    const region2Pool = REGION2_SCHOOLS.filter(s=>{
+      const req = GENDER_ONLY_SCHOOLS[s];
+      return !req || req === gender;
+    });
+    const missingSchools = region2Pool.filter(s=>!region2ValidWritten.includes(s));
+    if(missingSchools.length){
+      flags.push({level:'warn', msg:`구역내에 아직 쓰지 않은 학교 (${missingSchools.length}개): ${missingSchools.join(', ')}`});
     }
   }
   const r2dupSet = new Set();
