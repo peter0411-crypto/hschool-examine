@@ -400,6 +400,18 @@ const SPECIAL_SCHOOLS = [
 function buildSchoolIndex(list){ return list.map(name => ({ name, core: name.replace(/고$/,'') })); }
 const SCHOOL_INDEX = buildSchoolIndex(ALL_SCHOOLS);
 const SPECIAL_SCHOOL_INDEX = buildSchoolIndex(SPECIAL_SCHOOLS);
+// 한 글자 차이(오타·오인식, 예: "들마고"->"돌마고")까지 잡기 위한 편집거리 계산.
+function levenshtein(a, b){
+  const dp = Array.from({length:a.length+1}, ()=>new Array(b.length+1).fill(0));
+  for(let i=0;i<=a.length;i++) dp[i][0] = i;
+  for(let j=0;j<=b.length;j++) dp[0][j] = j;
+  for(let i=1;i<=a.length;i++){
+    for(let j=1;j<=b.length;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
 function normalizeRawSchoolText(raw){
   let s = String(raw||'').trim().replace(/\s+/g,'');
   if(!s) return '';
@@ -426,6 +438,13 @@ function matchNameAgainst(raw, list, index){
   )];
   if(candidates.length === 1) return { matched:candidates[0], ambiguous:false, candidates };
   if(candidates.length > 1) return { matched:null, ambiguous:true, candidates };
+  // 축약형 매칭이 하나도 안 걸리면, 한 글자 차이(편집거리 1)까지 오타·오인식으로 보고 재시도한다.
+  // 후보가 둘 이상이면(예: "성남"↔"성일"처럼 진짜 헷갈릴 수 있는 쌍) 자동으로 고르지 않고 애매함으로 남긴다.
+  const editCandidates = [...new Set(
+    index.filter(sc => sc.core.length>=2 && Math.abs(sc.core.length-inputCore.length)<=1 && levenshtein(sc.core, inputCore)===1).map(sc=>sc.name)
+  )];
+  if(editCandidates.length === 1) return { matched:editCandidates[0], ambiguous:false, candidates:editCandidates };
+  if(editCandidates.length > 1) return { matched:null, ambiguous:true, candidates:editCandidates };
   return { matched:null, ambiguous:false, candidates:[] };
 }
 function matchSchoolName(raw){ return matchNameAgainst(raw, ALL_SCHOOLS, SCHOOL_INDEX); }
