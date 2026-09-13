@@ -400,17 +400,37 @@ const SPECIAL_SCHOOLS = [
 function buildSchoolIndex(list){ return list.map(name => ({ name, core: name.replace(/고$/,'') })); }
 const SCHOOL_INDEX = buildSchoolIndex(ALL_SCHOOLS);
 const SPECIAL_SCHOOL_INDEX = buildSchoolIndex(SPECIAL_SCHOOLS);
-// 한 글자 차이(오타·오인식, 예: "들마고"->"돌마고")까지 잡기 위한 편집거리 계산.
-function levenshtein(a, b){
-  const dp = Array.from({length:a.length+1}, ()=>new Array(b.length+1).fill(0));
-  for(let i=0;i<=a.length;i++) dp[i][0] = i;
-  for(let j=0;j<=b.length;j++) dp[0][j] = j;
-  for(let i=1;i<=a.length;i++){
-    for(let j=1;j<=b.length;j++){
-      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+// 한글 인식 오타/오인식까지 잡기 위해, 낱글자 단위가 아니라 초성·중성·종성(자모) 단위로
+// 얼마나 다른지를 비교한다. 예: "성님"은 "성남"과 모음(중성)만 다르고(초성·종성 같음) 훨씬
+// 가깝고, "성일"과는 초성·종성이 둘 다 달라서 더 먼 것으로 정확히 구분된다.
+function decomposeHangul(ch){
+  const code = ch.charCodeAt(0) - 0xAC00;
+  if(code < 0 || code > 11171) return null; // 한글 완성형 음절이 아니면 분해 불가
+  return [Math.floor(code/588), Math.floor((code%588)/28), code%28]; // [초성, 중성, 종성]
+}
+function charSubCost(a, b){
+  if(a === b) return 0;
+  const da = decomposeHangul(a), db = decomposeHangul(b);
+  if(!da || !db) return 1; // 한글이 아니면(숫자 등) 기존처럼 같다/다르다만 구분
+  let diff = 0;
+  if(da[0] !== db[0]) diff++;
+  if(da[1] !== db[1]) diff++;
+  if(da[2] !== db[2]) diff++;
+  return diff / 3; // 자모 3개 중 몇 개가 다른지를 0~1 사이 비용으로 환산
+}
+// 자모 가중치를 반영한 편집거리 (삽입/삭제 비용은 1, 치환 비용은 charSubCost).
+function weightedEditDistance(a, b){
+  const n = a.length, m = b.length;
+  const dp = Array.from({length:n+1}, ()=>new Array(m+1).fill(0));
+  for(let i=0;i<=n;i++) dp[i][0] = i;
+  for(let j=0;j<=m;j++) dp[0][j] = j;
+  for(let i=1;i<=n;i++){
+    for(let j=1;j<=m;j++){
+      const subCost = charSubCost(a[i-1], b[j-1]);
+      dp[i][j] = Math.min(dp[i-1][j-1] + subCost, dp[i-1][j] + 1, dp[i][j-1] + 1);
     }
   }
-  return dp[a.length][b.length];
+  return dp[n][m];
 }
 function normalizeRawSchoolText(raw){
   let s = String(raw||'').trim().replace(/\s+/g,'');
@@ -427,6 +447,7 @@ function normalizeRawSchoolText(raw){
 // 입력이 실제 학교명 core의 "일부(축약)"일 때만 매칭하고(예: "대진"->"분당대진고"),
 // 반대로 입력이 더 길어서 실제 core를 우연히 포함하는 경우는 매칭하지 않는다
 // (예: "성남외고"가 "성남고"의 core "성남"을 포함한다고 해서 잘못 매칭되는 것을 방지).
+const FUZZY_MATCH_THRESHOLD = 0.7; // 이 값 이하로 가까운 후보만 오타/오인식으로 인정
 function matchNameAgainst(raw, list, index){
   const norm = normalizeRawSchoolText(raw);
   if(!norm) return { matched:null, ambiguous:false, candidates:[] };
@@ -438,13 +459,17 @@ function matchNameAgainst(raw, list, index){
   )];
   if(candidates.length === 1) return { matched:candidates[0], ambiguous:false, candidates };
   if(candidates.length > 1) return { matched:null, ambiguous:true, candidates };
-  // 축약형 매칭이 하나도 안 걸리면, 한 글자 차이(편집거리 1)까지 오타·오인식으로 보고 재시도한다.
-  // 후보가 둘 이상이면(예: "성남"↔"성일"처럼 진짜 헷갈릴 수 있는 쌍) 자동으로 고르지 않고 애매함으로 남긴다.
-  const editCandidates = [...new Set(
-    index.filter(sc => sc.core.length>=2 && Math.abs(sc.core.length-inputCore.length)<=1 && levenshtein(sc.core, inputCore)===1).map(sc=>sc.name)
-  )];
-  if(editCandidates.length === 1) return { matched:editCandidates[0], ambiguous:false, candidates:editCandidates };
-  if(editCandidates.length > 1) return { matched:null, ambiguous:true, candidates:editCandidates };
+  // 축약형 매칭이 하나도 안 걸리면, 자모 유사도가 가장 가까운 학교를 찾는다.
+  // 가장 가까운 후보가 유일하면 그걸로 매칭하고, 여러 학교가 똑같이 가까우면(예: "성남"과
+  // 거리가 같은 다른 학교가 또 있는 경우) 자동으로 고르지 않고 애매함으로 남긴다.
+  let minDist = Infinity;
+  const dists = index.map(sc => ({ name: sc.name, dist: weightedEditDistance(sc.core, inputCore) }));
+  dists.forEach(d => { if(d.dist < minDist) minDist = d.dist; });
+  if(minDist <= FUZZY_MATCH_THRESHOLD){
+    const bestCandidates = [...new Set(dists.filter(d => Math.abs(d.dist - minDist) < 1e-9).map(d=>d.name))];
+    if(bestCandidates.length === 1) return { matched:bestCandidates[0], ambiguous:false, candidates:bestCandidates };
+    if(bestCandidates.length > 1) return { matched:null, ambiguous:true, candidates:bestCandidates };
+  }
   return { matched:null, ambiguous:false, candidates:[] };
 }
 function matchSchoolName(raw){ return matchNameAgainst(raw, ALL_SCHOOLS, SCHOOL_INDEX); }
