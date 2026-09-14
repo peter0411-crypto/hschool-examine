@@ -367,6 +367,12 @@
       <div class="hint">현재 저장된 학생들의 1지망 학교별 인원 수입니다. 검증과는 무관한 단순 참고 자료입니다.</div>
       <div id="first-choice-stats"></div>
     </div>
+
+    <div class="panel">
+      <h2>특성화고 희망 통계 (참고용)</h2>
+      <div class="hint">원서 오른쪽 칸에 "특성화고 희망"을 체크한 학생들을, 적어낸 희망고별로 모았습니다. 예술고 희망도 함께 보여줍니다.</div>
+      <div id="specialty-stats"></div>
+    </div>
   </section>
 
 </main>
@@ -545,7 +551,7 @@ function switchTab(name){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+name));
   if(name === 'results') renderResults();
-  if(name === 'stats') renderFirstChoiceStats();
+  if(name === 'stats'){ renderFirstChoiceStats(); renderSpecialtyStats(); }
 }
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
@@ -1465,6 +1471,55 @@ function renderFirstChoiceStats(){
       <div><h4 style="font-size:13px;margin:0 0 6px;">학군내 1지망</h4>${tableHtml(r1Counts)}</div>
       <div><h4 style="font-size:13px;margin:0 0 6px;">구역내 1지망</h4>${tableHtml(r2Counts)}</div>
     </div>
+  `;
+}
+
+function renderSpecialtyStats(){
+  const container = document.getElementById('specialty-stats');
+  const nums = Object.keys(students);
+  if(nums.length === 0){ container.innerHTML = '<p class="small">아직 저장된 학생이 없습니다.</p>'; return; }
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // specialNotes에 저장된 문구(예: "특성화고 희망 (OO공고)")에서 키워드가 포함된 것만 모아
+  // 괄호 안의 희망고 이름별로 묶는다. 괄호(희망고 기재)가 없으면 별도로 모은다.
+  function collect(keyword){
+    const bySchool = {};
+    const noDetail = [];
+    nums.forEach(num=>{
+      const rec = students[num];
+      (rec.specialNotes||[]).forEach(note=>{
+        if(!note.includes(keyword)) return;
+        const m = note.match(/\(([^)]+)\)/);
+        const school = m ? m[1].trim() : '';
+        if(school){
+          (bySchool[school] = bySchool[school] || []).push(num);
+        } else {
+          noDetail.push(num);
+        }
+      });
+    });
+    return { bySchool, noDetail };
+  }
+
+  function tableHtml(result, label){
+    const entries = Object.entries(result.bySchool).sort((a,b)=>b[1].length-a[1].length || a[0].localeCompare(b[0],'ko'));
+    let rows = entries.map(([school,list])=>
+      `<tr><td>${esc(school)}</td><td style="text-align:right;">${list.length}명</td><td class="small">${list.slice().sort(compareStudentNum).join(', ')}</td></tr>`
+    ).join('');
+    if(result.noDetail.length){
+      rows += `<tr><td>(희망고 미기재)</td><td style="text-align:right;">${result.noDetail.length}명</td><td class="small">${result.noDetail.slice().sort(compareStudentNum).join(', ')}</td></tr>`;
+    }
+    if(!rows) return `<p class="small">${label} 희망 학생 없음</p>`;
+    return `<table><thead><tr><th>희망고</th><th style="text-align:right;">인원</th><th>학생 번호</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  const voc = collect('특성화고');
+  const art = collect('예술고');
+
+  container.innerHTML = `
+    <div style="margin-bottom:18px;"><h4 style="font-size:13px;margin:0 0 6px;">특성화고 희망</h4>${tableHtml(voc,'특성화고')}</div>
+    <div><h4 style="font-size:13px;margin:0 0 6px;">예술고 희망</h4>${tableHtml(art,'예술고')}</div>
   `;
 }
 
