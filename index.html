@@ -1334,11 +1334,12 @@ function validateStudent(num, rec){
   // 있어도 "아직 안 쓴 학교" 안내가 조용히 사라지는 걸 막을 수 있다.
   const region2RegularWritten = (rec.isSpecial ? region2.slice(1) : region2.slice());
   const region2ValidWritten = region2RegularWritten.filter(s => REGION2_SCHOOLS.includes(s));
+  const region2ValidUniqueCount = new Set(region2ValidWritten).size; // 중복 기재는 유효 개수에서 한 번만 센다
   const expectedRegularCount = expectedLen !== null ? (expectedLen - (rec.isSpecial ? 1 : 0)) : null;
   if(expectedLen !== null && region2.length !== expectedLen){
     flags.push({level:'warn', msg:`구역내 지망 개수가 ${region2.length}개 (예상 ${expectedLen}개: ${rec.isSpecial?'특목':'일반'}·${gender}).`});
   }
-  if(expectedRegularCount !== null && region2ValidWritten.length < expectedRegularCount){
+  if(expectedRegularCount !== null && region2ValidUniqueCount < expectedRegularCount){
     // 성별상 지원 가능한 2구역 학교 전체 목록 중, 아직(유효하게) 안 쓴 학교를 찾아 안내한다.
     const region2Pool = REGION2_SCHOOLS.filter(s=>{
       const req = GENDER_ONLY_SCHOOLS[s];
